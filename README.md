@@ -4,7 +4,16 @@ A compact, mathematically explicit **alignment engine** for generalized Procrust
 
 This is not “an R package containing many Procrustes functions.” It is a solver-transparent GPA engine: consensus-first, missing-aware, sparse-aware, and gauge-aware.
 
-**Milestone 0 (current):** specification and language-neutral conformance suite. There is no `gpa()` yet.
+**Current:** Milestone 1 — pairwise kernel. `procrustes()` and two-view `gpa()` are exact closed forms. Generalized (K≥3) GPA is next.
+
+```r
+library(gprocrustes)
+X <- matrix(rnorm(40), 20, 2)
+Y <- X %*% matrix(c(0, -1, 1, 0), 2, 2)
+fit <- procrustes(X, Y, transform = proc_orthogonal("SO"))
+fit$optimality_status   # "exact_closed_form"
+apply_proc_transform(fit$transform, X)
+```
 
 ## Specification
 

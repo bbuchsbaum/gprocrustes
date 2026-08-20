@@ -1,7 +1,7 @@
 Package: gprocrustes
 Type: Package
 Title: A Solver-Transparent Generalized Procrustes Engine
-Version: 0.0.0.9000
+Version: 0.0.1.9000
 Authors@R: person("Brad", "Buchsbaum", email = "brad.buchsbaum@gmail.com",
                   role = c("aut", "cre"))
 Description: Compact, mathematically explicit alignment engine for pairwise
@@ -11,6 +11,12 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 URL: https://github.com/bbuchsbaum/gprocrustes
 BugReports: https://github.com/bbuchsbaum/gprocrustes/issues
----
-# Milestone 0 ships specification and conformance fixtures only.
-# Imports (Matrix, RSpectra, ...) are added when solvers land.
+Imports:
+    Matrix,
+    stats
+Suggests:
+    jsonlite,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3

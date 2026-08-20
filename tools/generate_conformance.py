@@ -20,7 +20,18 @@ OBJ_ATOL = 1e-12
 
 
 def mat(a: np.ndarray) -> list:
-    return np.asarray(a, dtype=float).tolist()
+    out = np.asarray(a, dtype=float).tolist()
+    return _json_ready(out)
+
+
+def _json_ready(obj):
+    if isinstance(obj, float):
+        if not np.isfinite(obj):
+            return None
+        return obj
+    if isinstance(obj, list):
+        return [_json_ready(x) for x in obj]
+    return obj
 
 
 def write_fixture(doc: dict) -> None:

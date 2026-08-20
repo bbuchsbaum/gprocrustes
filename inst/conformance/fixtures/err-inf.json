@@ -16,7 +16,7 @@
         0.0
       ],
       [
-        Infinity,
+        null,
         1.0
       ]
     ],
@@ -34,6 +34,7 @@
   "expected": {
     "numerical_status": "error",
     "optimality_status": "not_applicable",
-    "error_code": "nonfinite_values"
+    "error_code": "nonfinite_values",
+    "notes": "The null entry stands for +Infinity; JSON cannot encode Inf."
   }
 }

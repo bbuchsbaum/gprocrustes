@@ -1,0 +1,10 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.beads$
+^\.claude$
+^\.cursor$
+^docs$
+^tools$
+^AGENTS\.md$
+^CLAUDE\.md$
+^\.github$
