@@ -13,6 +13,7 @@ The R API falls out of the mathematics. Do not invent a new objective, gauge, tr
 2. [docs/spec/00-conventions.md](docs/spec/00-conventions.md) — implementer-facing names and correspondence rules.
 3. [docs/spec/01-solver-guarantee-matrix.md](docs/spec/01-solver-guarantee-matrix.md) — the only allowed optimality claims.
 4. [inst/CHARTER.md](inst/CHARTER.md) — product charter and non-goals.
+5. [docs/references/README.md](docs/references/README.md) — local PDFs of Gower, Goodall, Ling, Bai–Bartoli, and supporting papers.
 
 ## Non-negotiable laws
 

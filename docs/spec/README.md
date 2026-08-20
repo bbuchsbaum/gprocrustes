@@ -11,3 +11,5 @@ The mathematics is the primary specification. The R API should fall out of it.
 | [03-public-api.md](03-public-api.md) | Intended public surface |
 
 Product framing: [inst/CHARTER.md](../../inst/CHARTER.md).
+
+Source PDFs: [docs/references/](../references/README.md).

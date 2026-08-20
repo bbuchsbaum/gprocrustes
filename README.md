@@ -16,6 +16,7 @@ The mathematics is the primary contract. The R API should fall out of it.
 4. [docs/spec/02-conformance-suite.md](docs/spec/02-conformance-suite.md) — oracle fixtures
 5. [docs/spec/03-public-api.md](docs/spec/03-public-api.md) — intended public surface
 6. [inst/CHARTER.md](inst/CHARTER.md) — product charter and non-goals
+7. [docs/references/](docs/references/README.md) — source PDFs (Gower, Goodall, Ling, Bai–Bartoli, …)
 
 Convention: rows are entities, columns are dimensions, right action \(T(X)=sXR+\mathbf{1}t\).
 

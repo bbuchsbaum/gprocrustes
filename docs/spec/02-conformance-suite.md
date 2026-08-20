@@ -58,7 +58,7 @@ Additional families: proper-rotation determinant correction; similarity residual
 
 ## Gower 1975 historical case
 
-Gower, J. C. (1975). Generalized procrustes analysis. *Psychometrika* 40:33–51.
+Gower, J. C. (1975). Generalized procrustes analysis. *Psychometrika* 40:33–51. Local copy: [docs/references/Gower_1975_generalized_procrustes.pdf](../references/Gower_1975_generalized_procrustes.pdf).
 
 The paper supplies:
 
