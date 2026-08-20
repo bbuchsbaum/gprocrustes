@@ -4,7 +4,7 @@ A compact, mathematically explicit **alignment engine** for generalized Procrust
 
 This is not “an R package containing many Procrustes functions.” It is a solver-transparent GPA engine: consensus-first, missing-aware, sparse-aware, and gauge-aware.
 
-**Current:** Milestone 1 — pairwise kernel. `procrustes()` and two-view `gpa()` are exact closed forms. Generalized (K≥3) GPA is next.
+**Current:** Milestone 6 — four engines (pairwise polar, Gower/GPM, IRLS/MM, LBW eigen) behind one compiler. Spectral work uses **eigencore**. The 1.0 API is frozen in [docs/spec/04-api-freeze.md](docs/spec/04-api-freeze.md).
 
 ```r
 library(gprocrustes)
@@ -12,7 +12,12 @@ X <- matrix(rnorm(40), 20, 2)
 Y <- X %*% matrix(c(0, -1, 1, 0), 2, 2)
 fit <- procrustes(X, Y, transform = proc_orthogonal("SO"))
 fit$optimality_status   # "exact_closed_form"
-apply_proc_transform(fit$transform, X)
+
+views <- list(A = X, B = Y, C = X %*% matrix(c(0, 1, -1, 0), 2, 2))
+g <- gpa(views, transform = proc_orthogonal("O"))
+g$solver                # "gpm"
+g$optimality_status     # "certified_global" only if Ling's dual test succeeds
+certify(g)
 ```
 
 ## Specification
@@ -35,8 +40,9 @@ Convention: rows are entities, columns are dimensions, right action \(T(X)=sXR+\
 - Symmetric consensus GPA (Gower), not an implicit reference
 - Matrix-free generalized power method and, when the dual test succeeds, an optimality certificate
 - Native row- and cell-missingness (different mathematics, different claims)
-- One deformable module: linear-basis warps, including affine and thin-plate splines
+- One deformable module: linear-basis warps, including affine and thin-plate splines, with an explicit reference covariance \(\Lambda\)
 - Inference as a separate layer from fitting
+- SVD / eigenproblems through [eigencore](https://bbuchsbaum.github.io/eigencore/)
 
 ## What it will not do
 

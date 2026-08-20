@@ -84,17 +84,36 @@ proc_tukey <- function(level = "landmark", c = 4.685) {
 #' @param max_iterations Maximum iterations for iterative solvers.
 #' @param keep_aligned `"lazy"` or `"materialize"`.
 #' @param certify `"auto"`, `"never"`, or `"always"`.
+#' @param init Initialization for iterative GPA: `"sequential"`, `"medoid"`,
+#'   or `"spectral"` (complete equal-size views; otherwise sequential).
+#' @param accelerate If `TRUE`, try a safeguarded extrapolated consensus step
+#'   and roll it back if the true objective rises.
+#' @param nstart Number of deterministic starts. `2` adds medoid; `3` adds
+#'   spectral. The lowest exact objective is kept.
+#' @param backend `"auto"` forms the small block Gram when \(Kd\) is below
+#'   `dense_block_threshold`; `"matrix_free"` never does; `"dense"` always does.
+#' @param dense_block_threshold Maximum \(Kd\) for a dense block-Gram eigenstep.
 #' @export
 gpa_control <- function(tolerance = 1e-8,
                         max_iterations = 500L,
                         keep_aligned = c("lazy", "materialize"),
-                        certify = c("auto", "never", "always")) {
+                        certify = c("auto", "never", "always"),
+                        init = c("sequential", "medoid", "spectral"),
+                        accelerate = TRUE,
+                        nstart = 1L,
+                        backend = c("auto", "matrix_free", "dense"),
+                        dense_block_threshold = 96L) {
   structure(
     list(
       tolerance = tolerance,
       max_iterations = as.integer(max_iterations),
       keep_aligned = match.arg(keep_aligned),
-      certify = match.arg(certify)
+      certify = match.arg(certify),
+      init = match.arg(init),
+      accelerate = isTRUE(accelerate),
+      nstart = as.integer(nstart)[1L],
+      backend = match.arg(backend),
+      dense_block_threshold = as.integer(dense_block_threshold)[1L]
     ),
     class = "gpa_control"
   )

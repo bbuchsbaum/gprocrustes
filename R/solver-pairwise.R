@@ -98,7 +98,7 @@ polar_factor <- function(C, group = c("O", "SO"), rank_tol = 1e-10) {
   if (!all(is.finite(C))) {
     .gproc_stop("nonfinite_values", "Nonfinite values in the cross-covariance.")
   }
-  sv <- svd(C, nu = d, nv = d)
+  sv <- .gproc_svd(C, nu = d, nv = d)
   sigma <- sv$d
   sigma1 <- if (length(sigma)) max(sigma[1L], 0) else 0
   rank <- if (sigma1 <= 0) 0L else as.integer(sum(sigma > rank_tol * sigma1))
@@ -155,7 +155,7 @@ polar_factor <- function(C, group = c("O", "SO"), rank_tol = 1e-10) {
       gamma = sum(R * C),
       objective = moms$a + moms$b - 2 * sum(R * C),
       rank = .polar_factor(C, "O", rank_tol)$rank,
-      singular_values = svd(C, nu = 0, nv = 0)$d,
+      singular_values = .gproc_svd(C, nu = 0L, nv = 0L)$d,
       transform_unique = TRUE,
       objective_unique = TRUE,
       unidentified_subspace_dimension = 0L,

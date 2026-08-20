@@ -26,9 +26,11 @@ gpa(
 
 \item{metric}{Weight / metric channels.}
 
-\item{loss}{Residual loss. Only squared \(L_2\) is used by the pairwise kernel.}
+\item{loss}{Residual loss. Huber / Tukey use landmark-vector IRLS.}
 
-\item{solver}{\code{"auto"} selects from the capability table.}
+\item{solver}{\code{"auto"} selects from the capability table. \code{"gpm"},
+\code{"gower_bcd"}, \code{"irls"}, \code{"mm"}, \code{"lbw_eigen"}, and \code{"pairwise_polar"}
+force engines.}
 
 \item{control}{A \code{gpa_control} object.}
 
@@ -40,6 +42,8 @@ gpa(
 A \code{gpa_fit}.
 }
 \description{
-Two complete views with squared \(L_2\) use the exact pairwise kernel.
-Three or more views are not implemented until the Gower solver lands.
+Unanchored orthogonal problems use the matrix-free generalized power
+method. Similarity problems use consensus-first Gower BCD. Two views
+with an explicit \code{anchor} (or a signed-permutation group) use the exact
+pairwise kernel.
 }

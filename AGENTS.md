@@ -5,6 +5,7 @@ The **primary specification** of this package is the mathematics:
 - [docs/spec/00-mathematics.md](docs/spec/00-mathematics.md)
 - [docs/spec/00-conventions.md](docs/spec/00-conventions.md)
 - [docs/spec/01-solver-guarantee-matrix.md](docs/spec/01-solver-guarantee-matrix.md)
+- [docs/spec/04-api-freeze.md](docs/spec/04-api-freeze.md) — 1.0 export surface and four-engine split
 
 Read those before changing objectives, gauges, solvers, or optimality claims. The Cursor rule `.cursor/rules/mathematics.mdc` restates the same contract.
 

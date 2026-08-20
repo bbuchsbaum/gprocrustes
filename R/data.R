@@ -3,10 +3,12 @@
 #' @param views Named list of entity-by-dimension matrix-like objects.
 #' @param ids Optional named list of entity identifiers, one vector per view.
 #' @param observed Optional named list of logical row masks (`TRUE` = observed).
+#' @param cells Optional named list of logical entity-by-dimension masks.
+#'   A missing cell is not a missing row.
 #' @param metadata Optional named list of per-view metadata.
 #' @return A `proc_data` object.
 #' @export
-proc_data <- function(views, ids = NULL, observed = NULL, metadata = NULL) {
+proc_data <- function(views, ids = NULL, observed = NULL, cells = NULL, metadata = NULL) {
   if (is.matrix(views) || inherits(views, "Matrix")) {
     views <- list(view1 = views)
   }
@@ -25,8 +27,15 @@ proc_data <- function(views, ids = NULL, observed = NULL, metadata = NULL) {
   }
   ids <- .gproc_align_named(ids, names(views), "ids")
   observed <- .gproc_align_named(observed, names(views), "observed")
+  cells <- .gproc_align_named(cells, names(views), "cells")
   maps <- .gproc_correspondence(views, ids)
   masks <- .gproc_row_masks(views, observed)
+  cell_masks <- .gproc_cell_local(views, cells)
+  for (nm in names(views)) {
+    if (!is.null(cell_masks[[nm]])) {
+      masks[[nm]] <- masks[[nm]] & apply(cell_masks[[nm]], 1L, any)
+    }
+  }
   structure(
     list(
       views = views,
@@ -34,11 +43,38 @@ proc_data <- function(views, ids = NULL, observed = NULL, metadata = NULL) {
       row_map = maps$row_map,
       global_ids = maps$global_ids,
       observed = masks,
+      cells = cell_masks,
       correspondence = maps$assumption,
       metadata = metadata
     ),
     class = "proc_data"
   )
+}
+
+#' Domain adapter: a 3-way entity-by-dimension-by-view array.
+#'
+#' @param x An array with dimensions \((n, d, K)\) or a list of matrices.
+#' @param view_names Optional view names.
+#' @export
+proc_from_array <- function(x, view_names = NULL) {
+  if (is.list(x) && !is.array(x)) {
+    if (!is.null(view_names)) names(x) <- view_names
+    return(proc_data(x))
+  }
+  if (length(dim(x)) != 3L) {
+    .gproc_stop("invalid_problem", "proc_from_array() expects an n x d x K array.")
+  }
+  k <- dim(x)[[3L]]
+  if (is.null(view_names)) {
+    view_names <- paste0("view", seq_len(k))
+  }
+  views <- lapply(seq_len(k), function(i) {
+    m <- x[, , i, drop = FALSE]
+    dim(m) <- dim(x)[1:2]
+    m
+  })
+  names(views) <- view_names
+  proc_data(views)
 }
 
 #' @export
@@ -150,6 +186,25 @@ print.proc_data <- function(x, ...) {
   out
 }
 
+#' @keywords internal
+.gproc_cell_local <- function(views, cells) {
+  out <- vector("list", length(views))
+  names(out) <- names(views)
+  for (nm in names(views)) {
+    C <- cells[[nm]]
+    if (is.null(C)) {
+      next
+    }
+    C <- as.matrix(C)
+    storage.mode(C) <- "logical"
+    if (nrow(C) != .gproc_nrow(views[[nm]]) || ncol(C) != .gproc_ncol(views[[nm]])) {
+      .gproc_stop("invalid_problem", sprintf("Cell mask for '%s' has the wrong dimension.", nm))
+    }
+    out[[nm]] <- C
+  }
+  out
+}
+
 #' Overlap graph of configurations.
 #'
 #' @param data A `proc_data` object.
@@ -160,23 +215,52 @@ overlap_graph <- function(data, min_overlap = 1L) {
   nms <- names(data$views)
   k <- length(nms)
   shared <- matrix(0L, k, k, dimnames = list(nms, nms))
+  ranks <- matrix(NA_integer_, k, k, dimnames = list(nms, nms))
   for (nm_i in nms) {
     for (nm_j in nms) {
-      if (identical(nm_i, nm_j)) next
       ii <- data$ids[[nm_i]][data$observed[[nm_i]]]
       jj <- data$ids[[nm_j]][data$observed[[nm_j]]]
-      shared[nm_i, nm_j] <- length(intersect(ii, jj))
+      common <- intersect(ii, jj)
+      shared[nm_i, nm_j] <- length(common)
+      if (length(common) && !is.null(data$views[[nm_i]])) {
+        ia <- match(common, data$ids[[nm_i]])
+        ja <- match(common, data$ids[[nm_j]])
+        C <- centered_crossprod(
+          data$views[[nm_i]][ia, , drop = FALSE],
+          data$views[[nm_j]][ja, , drop = FALSE]
+        )
+        sig <- .gproc_svd(C, nu = 0L, nv = 0L)$d
+        s1 <- if (length(sig)) max(sig[[1L]], 0) else 0
+        ranks[nm_i, nm_j] <- if (s1 <= 0) 0L else as.integer(sum(sig > 1e-10 * s1))
+      }
     }
   }
   adj <- shared >= min_overlap
   diag(adj) <- TRUE
   comp <- .gproc_components(adj)
+  support <- integer(length(data$global_ids))
+  names(support) <- data$global_ids
+  for (nm in nms) {
+    ids <- data$ids[[nm]][data$observed[[nm]]]
+    support[ids] <- support[ids] + 1L
+  }
+  edge_rank <- ranks
+  diag(edge_rank) <- NA_integer_
+  min_rank <- suppressWarnings(min(edge_rank, na.rm = TRUE))
+  if (!is.finite(min_rank)) min_rank <- NA_integer_
+  d <- ncol(data$views[[1L]])
   list(
     names = nms,
     overlap_count = shared,
+    overlap_rank = ranks,
+    min_overlap_rank = as.integer(min_rank),
     adjacency = adj,
     components = comp$membership,
-    n_components = comp$n
+    n_components = comp$n,
+    n_unobserved = as.integer(sum(support == 0L)),
+    n_singleton = as.integer(sum(support == 1L)),
+    relative_transforms_estimable = comp$n == 1L && is.finite(min_rank) && min_rank >= 1L,
+    unique_relative_rotation = comp$n == 1L && is.finite(min_rank) && min_rank >= d
   )
 }
 

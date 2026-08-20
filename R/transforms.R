@@ -46,6 +46,81 @@ proc_signed_permutation <- function() {
   )
 }
 
+#' Affine maps under Bai–Bartoli reference-space constraints.
+#'
+#' Right action \(T(X)=XA+\mathbf{1}t\), written as an LBW with a homogeneous
+#' column. `reference_covariance` is \(\Lambda\) in \(M^\top M=\Lambda\).
+#' It is a modeling choice, never estimated invisibly.
+#'
+#' @param reference_covariance Scalar or length-\(d\) vector \(\lambda\).
+#' @export
+proc_affine <- function(reference_covariance = 1) {
+  structure(
+    list(
+      family = "affine",
+      group = "affine",
+      translation = TRUE,
+      scaling = "none",
+      smoothness = 0,
+      reference_covariance = reference_covariance,
+      warp = "affine"
+    ),
+    class = c("proc_affine", "proc_lbw_spec", "proc_transform_spec")
+  )
+}
+
+#' Linear-basis warp: \(T(X)=\Phi B\) with quadratic penalty \(\operatorname{tr}(B^\top LB)\).
+#'
+#' @param basis Function `function(X)` returning \(\Phi\), or `"affine"`.
+#' @param penalty Symmetric penalty \(L\), a function of \(\Phi\), or `NULL`.
+#' @param smoothness Multiplier \(\mu\ge 0\).
+#' @param reference_covariance \(\Lambda\) in \(M^\top M=\Lambda\).
+#' @export
+proc_lbw <- function(basis,
+                     penalty = NULL,
+                     smoothness = 0,
+                     reference_covariance = 1) {
+  structure(
+    list(
+      family = "lbw",
+      group = "lbw",
+      translation = TRUE,
+      scaling = "none",
+      basis = basis,
+      penalty = penalty,
+      smoothness = smoothness,
+      reference_covariance = reference_covariance,
+      warp = "lbw"
+    ),
+    class = c("proc_lbw", "proc_lbw_spec", "proc_transform_spec")
+  )
+}
+
+#' Thin-plate spline as an LBW constructor.
+#'
+#' @param control_points Optional shared control-point matrix. `NULL` uses
+#'   each view's observed landmarks.
+#' @param smoothness Bending-energy weight \(\mu\).
+#' @param reference_covariance \(\Lambda\) in \(M^\top M=\Lambda\).
+#' @export
+proc_tps <- function(control_points = NULL,
+                     smoothness = 1,
+                     reference_covariance = 1) {
+  structure(
+    list(
+      family = "tps",
+      group = "tps",
+      translation = TRUE,
+      scaling = "none",
+      control_points = control_points,
+      smoothness = smoothness,
+      reference_covariance = reference_covariance,
+      warp = "tps"
+    ),
+    class = c("proc_tps", "proc_lbw_spec", "proc_transform_spec")
+  )
+}
+
 #' Expand a string shortcut into a transform specification.
 #'
 #' @param transform A `proc_transform_spec` or a string such as `"similarity"`.
@@ -89,6 +164,9 @@ as_proc_transform <- function(transform) {
     rotation = proc_orthogonal("SO"),
     similarity = proc_similarity(),
     signed_permutation = proc_signed_permutation(),
+    affine = proc_affine(),
+    tps = proc_tps(),
+    lbw = proc_lbw("affine"),
     .gproc_stop("invalid_problem", sprintf("Unknown transform shortcut '%s'.", transform))
   )
 }
@@ -119,6 +197,9 @@ proc_identity <- function(spec, d) {
 #' @export
 apply_proc_transform <- function(tr, X) {
   X <- .gproc_as_numeric_matrix(X, "X")
+  if (is.function(tr$apply_warp)) {
+    return(tr$apply_warp(X))
+  }
   if (.gproc_ncol(X) != nrow(tr$R)) {
     .gproc_stop("dimension_mismatch", "X does not match the transform dimension.")
   }
@@ -138,8 +219,19 @@ inverse_proc_transform <- function(tr) {
   if (!inherits(tr, "proc_fitted_transform")) {
     .gproc_stop("invalid_problem", "inverse_proc_transform() needs a fitted transform.")
   }
+  if (identical(tr$spec$family, "affine") && is.null(tr$apply_warp)) {
+    if (abs(det(tr$R)) <= 1e-12) {
+      .gproc_stop("inverse_unavailable", "Affine linear part is singular; no exact inverse.")
+    }
+    Rinv <- solve(tr$R)
+    tinv <- as.numeric(-tr$t %*% Rinv)
+    return(.proc_fitted(spec = tr$spec, R = Rinv, s = 1, t = tinv))
+  }
   if (!tr$spec$family %in% c("orthogonal", "similarity", "signed_permutation")) {
-    .gproc_stop("inverse_unavailable", "No exact inverse exists for this transform family.")
+    .gproc_stop(
+      "inverse_unavailable",
+      "No exact global inverse exists for this transform family; do not invent one."
+    )
   }
   if (!(tr$s > 0)) {
     .gproc_stop("inverse_unavailable", "Scale is zero; the transform is not invertible.")
@@ -155,6 +247,13 @@ inverse_proc_transform <- function(tr) {
 #' @param tr1,tr2 Fitted transforms.
 #' @export
 compose_proc_transform <- function(tr1, tr2) {
+  if (is.function(tr1$apply_warp) || is.function(tr2$apply_warp) ||
+      tr1$spec$family %in% c("tps", "lbw") || tr2$spec$family %in% c("tps", "lbw")) {
+    .gproc_stop(
+      "inverse_unavailable",
+      "Composition is not defined for a general linear-basis warp."
+    )
+  }
   R <- tr1$R %*% tr2$R
   s <- tr1$s * tr2$s
   t <- as.numeric(tr2$s * tr1$t %*% tr2$R + tr2$t)
@@ -166,9 +265,17 @@ compose_proc_transform <- function(tr1, tr2) {
 }
 
 #' @keywords internal
-.proc_fitted <- function(spec, R, s, t) {
+.proc_fitted <- function(spec, R, s, t, B = NULL, apply_warp = NULL, extra = NULL) {
   structure(
-    list(spec = spec, R = as.matrix(R), s = as.numeric(s)[1L], t = as.numeric(t)),
+    list(
+      spec = spec,
+      R = as.matrix(R),
+      s = as.numeric(s)[1L],
+      t = as.numeric(t),
+      B = B,
+      apply_warp = apply_warp,
+      extra = extra
+    ),
     class = "proc_fitted_transform"
   )
 }
@@ -205,6 +312,12 @@ degrees_of_freedom <- function(spec, d) {
   if (identical(spec$family, "signed_permutation")) {
     return(0)
   }
+  if (identical(spec$family, "affine")) {
+    return(as.integer(d * d + d))
+  }
+  if (spec$family %in% c("lbw", "tps")) {
+    return(NA_integer_)
+  }
   as.integer(rot + sc + tr)
 }
 
@@ -213,6 +326,9 @@ degrees_of_freedom <- function(spec, d) {
 #' @param tr Fitted transform.
 #' @export
 constraint_residual <- function(tr) {
+  if (tr$spec$family %in% c("affine", "lbw", "tps")) {
+    return(list(orthogonality = NA_real_, determinant = det(tr$R)))
+  }
   R <- tr$R
   orth <- sqrt(sum((crossprod(R) - diag(nrow(R)))^2))
   det_err <- if (identical(tr$spec$group, "SO")) abs(det(R) - 1) else 0

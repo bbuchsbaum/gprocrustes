@@ -4,7 +4,7 @@
 \alias{proc_data}
 \title{Construct a multi-view Procrustes data object.}
 \usage{
-proc_data(views, ids = NULL, observed = NULL, metadata = NULL)
+proc_data(views, ids = NULL, observed = NULL, cells = NULL, metadata = NULL)
 }
 \arguments{
 \item{views}{Named list of entity-by-dimension matrix-like objects.}
@@ -12,6 +12,9 @@ proc_data(views, ids = NULL, observed = NULL, metadata = NULL)
 \item{ids}{Optional named list of entity identifiers, one vector per view.}
 
 \item{observed}{Optional named list of logical row masks (\code{TRUE} = observed).}
+
+\item{cells}{Optional named list of logical entity-by-dimension masks.
+A missing cell is not a missing row.}
 
 \item{metadata}{Optional named list of per-view metadata.}
 }

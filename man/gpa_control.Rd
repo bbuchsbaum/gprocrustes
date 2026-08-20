@@ -8,7 +8,12 @@ gpa_control(
   tolerance = 1e-08,
   max_iterations = 500L,
   keep_aligned = c("lazy", "materialize"),
-  certify = c("auto", "never", "always")
+  certify = c("auto", "never", "always"),
+  init = c("sequential", "medoid", "spectral"),
+  accelerate = TRUE,
+  nstart = 1L,
+  backend = c("auto", "matrix_free", "dense"),
+  dense_block_threshold = 96L
 )
 }
 \arguments{
@@ -19,6 +24,20 @@ gpa_control(
 \item{keep_aligned}{\code{"lazy"} or \code{"materialize"}.}
 
 \item{certify}{\code{"auto"}, \code{"never"}, or \code{"always"}.}
+
+\item{init}{Initialization for iterative GPA: \code{"sequential"}, \code{"medoid"},
+or \code{"spectral"} (complete equal-size views; otherwise sequential).}
+
+\item{accelerate}{If \code{TRUE}, try a safeguarded extrapolated consensus step
+and roll it back if the true objective rises.}
+
+\item{nstart}{Number of deterministic starts. \code{2} adds medoid; \code{3} adds
+spectral. The lowest exact objective is kept.}
+
+\item{backend}{\code{"auto"} forms the small block Gram when \(Kd\) is below
+\code{dense_block_threshold}; \code{"matrix_free"} never does; \code{"dense"} always does.}
+
+\item{dense_block_threshold}{Maximum \(Kd\) for a dense block-Gram eigenstep.}
 }
 \description{
 Solver control.

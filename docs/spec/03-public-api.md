@@ -28,9 +28,9 @@ Typed objects, not undocumented matrices or a single `weights` argument.
 proc_orthogonal(group = c("O", "SO"))
 proc_similarity(group = c("SO", "O"), translation = TRUE, scaling = "isotropic")
 proc_signed_permutation()
-proc_affine()
-proc_lbw(basis, penalty)
-proc_tps(control_points, smoothness)
+proc_affine(reference_covariance = 1)
+proc_lbw(basis, penalty, smoothness = 0, reference_covariance = 1)
+proc_tps(control_points = NULL, smoothness = 1, reference_covariance = 1)
 
 proc_gauge(scale = c("gower", "preshape", "fixed_consensus", "none"),
            orientation = c("free", "principal"))
