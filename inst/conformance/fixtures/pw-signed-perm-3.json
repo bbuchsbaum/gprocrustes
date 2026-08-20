@@ -1,0 +1,92 @@
+{
+  "id": "pw-signed-perm-3",
+  "title": "Signed-permutation assignment on a 3x3 cross-covariance",
+  "kind": "pairwise",
+  "tags": [
+    "signed_permutation"
+  ],
+  "problem": {
+    "transform": {
+      "group": "signed_permutation",
+      "translation": false,
+      "scaling": "none"
+    },
+    "loss": "squared_l2",
+    "source": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "target": [
+      [
+        0.1,
+        0.8,
+        0.0
+      ],
+      [
+        0.9,
+        0.05,
+        0.2
+      ],
+      [
+        0.0,
+        0.1,
+        -0.7
+      ]
+    ],
+    "notes_crosscovariance": [
+      [
+        0.1,
+        0.9,
+        0.0
+      ],
+      [
+        0.8,
+        0.05,
+        0.1
+      ],
+      [
+        0.0,
+        0.2,
+        -0.7
+      ]
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "exact_closed_form",
+    "rotation": [
+      [
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0
+      ]
+    ],
+    "rotation_compare": "exact",
+    "objective_unique": true,
+    "transform_unique": true
+  },
+  "notes": "Reward |C_jk|; D_kk = sign(C_{P(k),k})."
+}

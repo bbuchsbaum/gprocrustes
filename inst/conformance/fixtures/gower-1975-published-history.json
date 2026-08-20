@@ -1,0 +1,26 @@
+{
+  "id": "gower-1975-published-history",
+  "title": "Placeholder for Gower 1975 published successive residuals",
+  "kind": "gower_history",
+  "citation": "Gower, J. C. (1975). Psychometrika 40:33-51, Tables 1-2.",
+  "tags": [
+    "gower",
+    "historical",
+    "transcription-needed"
+  ],
+  "problem": {
+    "transform": {
+      "group": "similarity",
+      "translation": true,
+      "scaling": "gower"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "successive residual sums of squares must match Table 2 within published rounding"
+    ]
+  },
+  "notes": "Do not invent published digits. Transcribe Table 1 configurations and Table 2 residual history from the 1975 paper before treating this fixture as an oracle."
+}

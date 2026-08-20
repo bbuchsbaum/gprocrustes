@@ -1,0 +1,39 @@
+{
+  "id": "err-inf",
+  "title": "Infinite values are an error",
+  "kind": "error",
+  "tags": [
+    "error",
+    "nonfinite"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "source": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        Infinity,
+        1.0
+      ]
+    ],
+    "target": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        1.0,
+        0.0
+      ]
+    ]
+  },
+  "expected": {
+    "numerical_status": "error",
+    "optimality_status": "not_applicable",
+    "error_code": "nonfinite_values"
+  }
+}

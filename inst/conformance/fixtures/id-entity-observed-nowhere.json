@@ -1,0 +1,58 @@
+{
+  "id": "id-entity-observed-nowhere",
+  "title": "Global id present in the map but observed by no view",
+  "kind": "identifiability",
+  "tags": [
+    "overlap"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "views": [
+      {
+        "name": "A",
+        "matrix": [
+          [
+            -0.8359982705109273,
+            1.61154424000557
+          ],
+          [
+            0.015992011662207744,
+            -0.13997986955287692
+          ]
+        ],
+        "ids": [
+          "a",
+          "b"
+        ]
+      },
+      {
+        "name": "B",
+        "matrix": [
+          [
+            -0.037517387090845886,
+            -0.10837100269365073
+          ],
+          [
+            -1.1228128315400046,
+            -1.5437896530186994
+          ]
+        ],
+        "ids": [
+          "a",
+          "b"
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "connected_components": 1,
+    "laws": [
+      "entities observed nowhere must be reported; they do not enter M"
+    ]
+  },
+  "notes": "A declared global entity 'z' with no observations is a diagnostic, not a row of M."
+}

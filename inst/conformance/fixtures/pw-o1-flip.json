@@ -1,0 +1,112 @@
+{
+  "id": "pw-o1-flip",
+  "title": "Pairwise O(1) recovers reflection on the line",
+  "kind": "pairwise",
+  "tags": [
+    "d1",
+    "O",
+    "reflection"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O",
+      "translation": false,
+      "scaling": "none"
+    },
+    "loss": "squared_l2",
+    "source": [
+      [
+        1.0
+      ],
+      [
+        2.0
+      ],
+      [
+        3.0
+      ],
+      [
+        4.0
+      ]
+    ],
+    "target": [
+      [
+        -1.0
+      ],
+      [
+        -2.0
+      ],
+      [
+        -3.0
+      ],
+      [
+        -4.0
+      ]
+    ],
+    "row_weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "views": [
+      {
+        "name": "source",
+        "matrix": [
+          [
+            1.0
+          ],
+          [
+            2.0
+          ],
+          [
+            3.0
+          ],
+          [
+            4.0
+          ]
+        ]
+      },
+      {
+        "name": "target",
+        "matrix": [
+          [
+            -1.0
+          ],
+          [
+            -2.0
+          ],
+          [
+            -3.0
+          ],
+          [
+            -4.0
+          ]
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "exact_closed_form",
+    "objective": 0.0,
+    "objective_atol": 1e-12,
+    "objective_rtol": 0.0,
+    "scale": 1.0,
+    "translation": [
+      0.0
+    ],
+    "rotation": [
+      [
+        -1.0
+      ]
+    ],
+    "rotation_compare": "polar",
+    "effective_rank": 1,
+    "transform_unique": true,
+    "objective_unique": true,
+    "unidentified_subspace_dimension": 0,
+    "gamma": 5.0,
+    "a": 5.0,
+    "b": 5.0
+  }
+}

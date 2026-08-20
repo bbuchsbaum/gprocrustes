@@ -1,0 +1,23 @@
+{
+  "id": "law-preshape-unit-frobenius",
+  "title": "Preshape configurations have unit Frobenius norm after centering",
+  "kind": "law",
+  "tags": [
+    "law",
+    "preshape"
+  ],
+  "problem": {
+    "transform": {
+      "group": "SO",
+      "scaling": "preshape"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "||HX / ||HX||_F||_F = 1",
+      "subsequent optimization is rotation-only"
+    ]
+  }
+}

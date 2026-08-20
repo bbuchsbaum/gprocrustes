@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gprocrustes.dev/conformance/fixture.schema.json",
+  "title": "gprocrustes conformance fixture",
+  "type": "object",
+  "required": ["id", "title", "kind", "problem", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "pairwise",
+        "moments",
+        "law",
+        "error",
+        "gower_history",
+        "identifiability",
+        "certificate"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "citation": { "type": "string" },
+    "notes": { "type": "string" },
+    "problem": { "$ref": "#/$defs/problem" },
+    "expected": { "$ref": "#/$defs/expected" }
+  },
+  "$defs": {
+    "matrix": {
+      "description": "Row-nested n-by-d array, or a binary pointer.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["path", "nrow", "ncol", "dtype", "order"],
+          "properties": {
+            "path": { "type": "string" },
+            "nrow": { "type": "integer", "minimum": 0 },
+            "ncol": { "type": "integer", "minimum": 0 },
+            "dtype": { "const": "float64_le" },
+            "order": { "enum": ["column-major", "row-major"] }
+          }
+        }
+      ]
+    },
+    "problem": {
+      "type": "object",
+      "required": ["transform"],
+      "properties": {
+        "transform": {
+          "type": "object",
+          "required": ["group"],
+          "properties": {
+            "group": {
+              "type": "string",
+              "enum": ["O", "SO", "similarity", "signed_permutation", "affine", "lbw", "none"]
+            },
+            "translation": { "type": "boolean" },
+            "scaling": {
+              "type": "string",
+              "enum": ["none", "isotropic", "preshape", "gower", "fixed_consensus"]
+            }
+          }
+        },
+        "loss": {
+          "type": "string",
+          "enum": ["squared_l2", "huber", "tukey"]
+        },
+        "views": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/view" }
+        },
+        "target": { "$ref": "#/$defs/matrix" },
+        "source": { "$ref": "#/$defs/matrix" },
+        "row_weights": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "configuration_weights": {
+          "type": "array",
+          "items": { "type": "number" }
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "required": ["name", "matrix"],
+      "properties": {
+        "name": { "type": "string" },
+        "matrix": { "$ref": "#/$defs/matrix" },
+        "ids": {
+          "type": "array",
+          "items": { "type": ["string", "integer"] }
+        },
+        "row_mask": {
+          "type": "array",
+          "items": { "type": "boolean" }
+        },
+        "cell_mask": { "$ref": "#/$defs/matrix" }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["numerical_status"],
+      "properties": {
+        "numerical_status": {
+          "type": "string",
+          "enum": ["exact", "converged", "error", "invalid_problem"]
+        },
+        "optimality_status": {
+          "type": "string",
+          "enum": [
+            "exact_closed_form",
+            "certified_global",
+            "first_order_stationary",
+            "blockwise_stationary",
+            "converged_unverified",
+            "not_converged",
+            "not_applicable"
+          ]
+        },
+        "error_code": { "type": "string" },
+        "objective": { "type": "number" },
+        "objective_atol": { "type": "number" },
+        "objective_rtol": { "type": "number" },
+        "scale": { "type": "number" },
+        "translation": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "rotation": { "$ref": "#/$defs/matrix" },
+        "rotation_compare": {
+          "type": "string",
+          "enum": ["exact", "up_to_gauge", "up_to_sign", "polar"]
+        },
+        "effective_rank": { "type": "integer" },
+        "transform_unique": { "type": "boolean" },
+        "objective_unique": { "type": "boolean" },
+        "unidentified_subspace_dimension": { "type": "integer" },
+        "gamma": { "type": "number" },
+        "a": { "type": "number" },
+        "b": { "type": "number" },
+        "crossproduct": { "$ref": "#/$defs/matrix" },
+        "connected_components": { "type": "integer" },
+        "certificate": {
+          "type": "string",
+          "enum": ["certified_global", "not_certified", "unavailable"]
+        },
+        "laws": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

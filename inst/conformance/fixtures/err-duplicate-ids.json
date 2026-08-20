@@ -1,0 +1,38 @@
+{
+  "id": "err-duplicate-ids",
+  "title": "Duplicate entity identifiers without an aggregation rule",
+  "kind": "error",
+  "tags": [
+    "error",
+    "correspondence"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "views": [
+      {
+        "name": "A",
+        "matrix": [
+          [
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ],
+        "ids": [
+          "a",
+          "a"
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "error",
+    "optimality_status": "not_applicable",
+    "error_code": "duplicate_entity_ids"
+  }
+}

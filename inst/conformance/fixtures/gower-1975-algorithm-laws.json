@@ -1,0 +1,29 @@
+{
+  "id": "gower-1975-algorithm-laws",
+  "title": "Gower 1975 algorithm laws (no invented table digits)",
+  "kind": "gower_history",
+  "citation": "Gower, J. C. (1975). Psychometrika 40:33-51.",
+  "tags": [
+    "gower",
+    "historical"
+  ],
+  "problem": {
+    "transform": {
+      "group": "similarity",
+      "translation": true,
+      "scaling": "gower"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "each rotation/scale update is an exact pairwise Procrustes step against the current consensus",
+      "each consensus update is the arithmetic (or weighted) mean",
+      "the residual is monotone nonincreasing",
+      "a global energy constraint prevents the collapse s_i=0, M=0",
+      "monotone decrease does not prove a global optimum",
+      "the energy table is not ANOVA unless a sampling model is declared"
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "cert-gpm-fixed-point-shape",
+  "title": "Certificate report fields at a GPM fixed point",
+  "kind": "certificate",
+  "tags": [
+    "certificate"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    }
+  },
+  "expected": {
+    "numerical_status": "converged",
+    "optimality_status": "first_order_stationary",
+    "certificate": "not_certified",
+    "laws": [
+      "report r_dual = ||CS-Lambda S|| / (1+||CS||)",
+      "report a lower bound on lambda_min(Lambda-C)",
+      "uniqueness if lambda_{d+1}(Lambda-C)>0",
+      "without a nonnegative bound the status stays stationary"
+    ]
+  }
+}

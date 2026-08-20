@@ -1,0 +1,23 @@
+{
+  "id": "law-huber-rotationally-invariant",
+  "title": "Landmark-vector Huber is invariant to a common rotation of residuals",
+  "kind": "law",
+  "tags": [
+    "law",
+    "robust"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "loss": "huber"
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "rho(||e_j||) is unchanged if every residual is right-multiplied by Q in O(d)",
+      "coordinatewise Huber is not rotationally invariant"
+    ]
+  }
+}

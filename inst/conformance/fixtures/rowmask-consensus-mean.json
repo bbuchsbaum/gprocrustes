@@ -1,0 +1,82 @@
+{
+  "id": "rowmask-consensus-mean",
+  "title": "Row-masked consensus is the observed-data weighted mean",
+  "kind": "law",
+  "tags": [
+    "missing",
+    "row-mask"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O",
+      "translation": false,
+      "scaling": "none"
+    },
+    "views": [
+      {
+        "name": "A",
+        "matrix": [
+          [
+            1.0,
+            0.0
+          ],
+          [
+            2.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0
+          ]
+        ],
+        "ids": [
+          "u",
+          "v",
+          "w"
+        ],
+        "row_mask": [
+          true,
+          true,
+          false
+        ]
+      },
+      {
+        "name": "B",
+        "matrix": [
+          [
+            1.2,
+            0.1
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            3.0,
+            0.0
+          ]
+        ],
+        "ids": [
+          "u",
+          "v",
+          "w"
+        ],
+        "row_mask": [
+          true,
+          false,
+          true
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "M_u = mean of observed transformed rows for u",
+      "M_v uses only view A",
+      "M_w uses only view B",
+      "implicit zeros are not missing"
+    ]
+  }
+}

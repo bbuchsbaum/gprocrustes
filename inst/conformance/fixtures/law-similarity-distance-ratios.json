@@ -1,0 +1,23 @@
+{
+  "id": "law-similarity-distance-ratios",
+  "title": "Similarity preserves distance ratios",
+  "kind": "law",
+  "tags": [
+    "law",
+    "similarity"
+  ],
+  "problem": {
+    "transform": {
+      "group": "similarity",
+      "translation": true,
+      "scaling": "isotropic"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "d(T(x),T(y)) / d(T(u),T(v)) = d(x,y)/d(u,v) when denominators are nonzero"
+    ]
+  }
+}

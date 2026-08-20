@@ -1,0 +1,83 @@
+{
+  "id": "pw-one-landmark",
+  "title": "Single observed landmark in d=2",
+  "kind": "pairwise",
+  "tags": [
+    "rank",
+    "one-landmark"
+  ],
+  "problem": {
+    "transform": {
+      "group": "similarity",
+      "translation": true,
+      "scaling": "none",
+      "rotation_group": "O"
+    },
+    "loss": "squared_l2",
+    "source": [
+      [
+        1.2,
+        -0.4
+      ]
+    ],
+    "target": [
+      [
+        0.3,
+        1.1
+      ]
+    ],
+    "row_weights": [
+      1.0
+    ],
+    "views": [
+      {
+        "name": "source",
+        "matrix": [
+          [
+            1.2,
+            -0.4
+          ]
+        ]
+      },
+      {
+        "name": "target",
+        "matrix": [
+          [
+            0.3,
+            1.1
+          ]
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "exact_closed_form",
+    "objective": 0.0,
+    "objective_atol": 1e-12,
+    "objective_rtol": 0.0,
+    "scale": 1.0,
+    "translation": [
+      -0.8999999999999999,
+      1.5
+    ],
+    "rotation": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "rotation_compare": "polar",
+    "effective_rank": 0,
+    "transform_unique": false,
+    "objective_unique": true,
+    "unidentified_subspace_dimension": 2,
+    "gamma": 0.0,
+    "a": 0.0,
+    "b": 0.0
+  }
+}

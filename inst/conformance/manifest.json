@@ -1,0 +1,6 @@
+{
+  "n_fixtures": 72,
+  "schema": "inst/conformance/schema.json",
+  "generator": "tools/generate_conformance.py",
+  "seed": 20260820
+}

@@ -1,0 +1,21 @@
+{
+  "id": "law-so-det-plus-one",
+  "title": "Every SO(d) factor has determinant +1",
+  "kind": "law",
+  "tags": [
+    "law",
+    "SO"
+  ],
+  "problem": {
+    "transform": {
+      "group": "SO"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "det(R)=+1 for every proper-rotation fit"
+    ]
+  }
+}

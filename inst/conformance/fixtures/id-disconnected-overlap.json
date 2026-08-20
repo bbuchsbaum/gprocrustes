@@ -1,0 +1,79 @@
+{
+  "id": "id-disconnected-overlap",
+  "title": "Two configurations with no shared entities: disconnected overlap graph",
+  "kind": "identifiability",
+  "tags": [
+    "overlap",
+    "error-default"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "views": [
+      {
+        "name": "A",
+        "matrix": [
+          [
+            -1.4363494155527028,
+            -0.7000422518724524
+          ],
+          [
+            -0.1668380579144809,
+            -0.8159964019750422
+          ],
+          [
+            0.762369459538843,
+            1.8671269850056922
+          ],
+          [
+            0.023321635934766296,
+            0.7992269294910174
+          ]
+        ],
+        "ids": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      {
+        "name": "B",
+        "matrix": [
+          [
+            0.5662903872787814,
+            -0.5580442040992426
+          ],
+          [
+            1.304047862834318,
+            -0.23512306303002609
+          ],
+          [
+            -1.04407252649011,
+            0.9226811919801707
+          ],
+          [
+            -0.21093115332870865,
+            -0.07508740280983486
+          ]
+        ],
+        "ids": [
+          "e",
+          "f",
+          "g",
+          "h"
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "invalid_problem",
+    "optimality_status": "not_applicable",
+    "error_code": "disconnected_overlap_graph",
+    "connected_components": 2,
+    "laws": [
+      "default is an error; an explicit option may fit components separately"
+    ]
+  }
+}

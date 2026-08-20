@@ -1,0 +1,25 @@
+{
+  "id": "cert-od-unavailable-default",
+  "title": "Certificate applies only to the O(d) GOPP trace problem",
+  "kind": "certificate",
+  "tags": [
+    "certificate"
+  ],
+  "problem": {
+    "transform": {
+      "group": "SO",
+      "translation": true,
+      "scaling": "isotropic"
+    }
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "certificate": "unavailable",
+    "laws": [
+      "Ling dual certificate is for O(d) GOPP",
+      "do not reuse for SO(d), robust losses, or cell masks",
+      "certificate unavailable is not probably global"
+    ]
+  }
+}

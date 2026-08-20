@@ -1,0 +1,27 @@
+---
+description: The mathematical specification is the primary contract of gprocrustes. Read it before changing objectives, gauges, solvers, or optimality claims.
+alwaysApply: true
+---
+
+# Mathematics is the primary specification
+
+The R API falls out of the mathematics. Do not invent a new objective, gauge, transformation group, missingness model, or optimality claim from convenience.
+
+## Canonical sources (read before editing solvers or fits)
+
+1. [docs/spec/00-mathematics.md](docs/spec/00-mathematics.md) — primary specification (42 sections).
+2. [docs/spec/00-conventions.md](docs/spec/00-conventions.md) — implementer-facing names and correspondence rules.
+3. [docs/spec/01-solver-guarantee-matrix.md](docs/spec/01-solver-guarantee-matrix.md) — the only allowed optimality claims.
+4. [inst/CHARTER.md](inst/CHARTER.md) — product charter and non-goals.
+
+## Non-negotiable laws
+
+- Rows are entities, columns are dimensions; right action \(T(X)=sXR+\mathbf{1}t\).
+- \(O(d)\) and \(SO(d)\) are different groups, not a Boolean afterthought.
+- Estimation returns an equivalence class; canonicalization is a later presentation.
+- “Certificate unavailable” never becomes “probably global.”
+- Missing rows are not missing cells. Implicit sparse zeros are never missing.
+- Superimposition metric \(\Sigma_S\) and model covariance \(\Sigma_M\) are different objects.
+- Implementation uses solves and moments, never explicit inverses or `scale(X)` densification.
+
+If an implementation disagrees with the mathematics document, the mathematics document wins.

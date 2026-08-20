@@ -3,3 +3,27 @@
 .dolt/
 *.db
 .beads-credential-key
+
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+src/*.o
+src/*.so
+src/*.dll
+inst/doc
+/doc/
+/Meta/
+.Rd2pdf*
+*.tar.gz
+.httr-oauth
+renv/library/
+renv/staging/
+
+# Python fixture generator
+__pycache__/
+*.pyc
+.venv/
+

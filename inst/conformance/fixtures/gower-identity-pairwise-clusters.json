@@ -1,0 +1,109 @@
+{
+  "id": "gower-identity-pairwise-clusters",
+  "title": "Gower identity (2) on a 3-configuration 4-point example",
+  "kind": "gower_history",
+  "citation": "Gower, J. C. (1975). Psychometrika 40:33-51, equation (2).",
+  "tags": [
+    "gower",
+    "historical"
+  ],
+  "problem": {
+    "transform": {
+      "group": "similarity",
+      "translation": true,
+      "scaling": "gower"
+    },
+    "views": [
+      {
+        "name": "X1",
+        "matrix": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          [
+            0.0,
+            1.0
+          ]
+        ],
+        "ids": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      {
+        "name": "X2",
+        "matrix": [
+          [
+            0.1,
+            -0.2
+          ],
+          [
+            1.055336489125606,
+            -0.49552020666133956
+          ],
+          [
+            1.3508566957869457,
+            0.45981628246426637
+          ],
+          [
+            0.3955202066613396,
+            0.755336489125606
+          ]
+        ],
+        "ids": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      },
+      {
+        "name": "X3",
+        "matrix": [
+          [
+            -0.05,
+            0.15
+          ],
+          [
+            1.055273192803462,
+            0.6173020107703806
+          ],
+          [
+            0.5879711820330814,
+            1.7225752035738426
+          ],
+          [
+            -0.5173020107703806,
+            1.255273192803462
+          ]
+        ],
+        "ids": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "sum_{i<j} ||Pi-Pj||^2 = K * sum_i ||Pi-G||^2 at the centroid G",
+      "after optimal translations the configurations share a centroid"
+    ]
+  },
+  "notes": "Geometry matches Gower Figure 1 (m=3,n=4,p=2). Coordinates are not claimed as Table 1."
+}

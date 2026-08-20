@@ -1,0 +1,48 @@
+{
+  "id": "cellmask-not-svd",
+  "title": "Coordinate-wise masks destroy the ordinary SVD update",
+  "kind": "law",
+  "tags": [
+    "missing",
+    "cell-mask"
+  ],
+  "problem": {
+    "transform": {
+      "group": "O"
+    },
+    "views": [
+      {
+        "name": "A",
+        "matrix": [
+          [
+            1.0,
+            2.0
+          ],
+          [
+            3.0,
+            4.0
+          ]
+        ],
+        "cell_mask": [
+          [
+            1.0,
+            0.0
+          ],
+          [
+            1.0,
+            1.0
+          ]
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "numerical_status": "exact",
+    "optimality_status": "not_applicable",
+    "laws": [
+      "missing rows != missing arbitrary cells",
+      "ordinary polar factor is not an exact block update",
+      "allowed claim is first-order stationary or MM"
+    ]
+  }
+}
