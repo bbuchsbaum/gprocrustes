@@ -9,16 +9,18 @@ Description: Compact, mathematically explicit alignment engine for pairwise
     sparse-aware, and honest about optimality guarantees.
 License: MIT + file LICENSE
 Encoding: UTF-8
-URL: https://github.com/bbuchsbaum/gprocrustes
-BugReports: https://github.com/bbuchsbaum/gprocrustes/issues
 Imports:
     eigencore,
     Matrix,
     stats
 Suggests:
+    broom,
     ggplot2,
     jsonlite,
+    knitr,
+    rmarkdown,
     testthat (>= 3.0.0)
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

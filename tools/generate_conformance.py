@@ -830,28 +830,134 @@ def main() -> None:
             },
         }
     )
+    # Table 2: 9 carcasses (rows) by 7 characters (columns), three judges.
+    # Table 5: successive Sr. Digits transcribed from Psychometrika 40:33-51;
+    # Table 5 verified against a render of page 49. Gower's rotation/scale
+    # schedule is not our BCD history; the published path is an oracle for
+    # implementations that follow his steps, not a claim that gpa() matches it.
+    judge1 = np.array(
+        [
+            [47, 44, 49, 38, 35, 40, 40],
+            [72, 45, 41, 77, 72, 73, 35],
+            [61, 49, 40, 58, 58, 62, 30],
+            [66, 56, 45, 55, 53, 46, 30],
+            [37, 72, 50, 27, 30, 33, 25],
+            [76, 76, 53, 81, 79, 75, 45],
+            [64, 59, 51, 72, 61, 66, 40],
+            [21, 70, 43, 27, 22, 26, 20],
+            [71, 70, 34, 72, 72, 71, 35],
+        ],
+        dtype=float,
+    )
+    judge2 = np.array(
+        [
+            [31, 39, 33, 29, 48, 38, 42],
+            [30, 60, 36, 22, 36, 34, 39],
+            [27, 55, 30, 18, 28, 22, 42],
+            [48, 52, 53, 27, 21, 30, 31],
+            [20, 55, 28, 22, 33, 27, 35],
+            [21, 42, 31, 46, 76, 33, 42],
+            [30, 52, 53, 35, 44, 30, 44],
+            [5, 57, 53, 12, 13, 6, 31],
+            [55, 63, 53, 77, 79, 57, 49],
+        ],
+        dtype=float,
+    )
+    judge3 = np.array(
+        [
+            [43, 46, 44, 22, 53, 44, 29],
+            [53, 79, 75, 79, 73, 52, 27],
+            [22, 85, 83, 19, 27, 17, 22],
+            [28, 89, 78, 13, 29, 20, 24],
+            [75, 86, 85, 34, 75, 55, 38],
+            [53, 79, 82, 72, 78, 74, 38],
+            [15, 85, 85, 46, 75, 52, 35],
+            [5, 95, 95, 3, 20, 2, 24],
+            [27, 78, 85, 89, 92, 81, 41],
+        ],
+        dtype=float,
+    )
     emit(
         {
             "id": "gower-1975-published-history",
-            "title": "Placeholder for Gower 1975 published successive residuals",
+            "title": "Gower 1975 Table 2 carcass scores and Table 5 successive Sr",
             "kind": "gower_history",
-            "citation": "Gower, J. C. (1975). Psychometrika 40:33-51, Tables 1-2.",
-            "tags": ["gower", "historical", "transcription-needed"],
+            "citation": "Gower, J. C. (1975). Psychometrika 40:33-51, Tables 2 and 5.",
+            "tags": ["gower", "historical", "transcribed"],
             "problem": {
                 "transform": {
                     "group": "similarity",
                     "translation": True,
                     "scaling": "gower",
                 },
+                "views": [
+                    view("judge_1", judge1, ids=list(range(1, 10))),
+                    view("judge_2", judge2, ids=list(range(1, 10))),
+                    view("judge_3", judge3, ids=list(range(1, 10))),
+                ],
             },
             "expected": {
                 "numerical_status": "exact",
                 "optimality_status": "not_applicable",
                 "laws": [
-                    "successive residual sums of squares must match Table 2 within published rounding",
+                    "successive residual sums of squares must match Table 5 within published rounding when the 1975 rotation-then-scale schedule is followed",
+                    "Gower stops when successive Sr differ by less than 0.0001 after the scaling step",
+                    "Sr increased slightly after rotation steps 6 and 7 in the published path; Gower attributes that to 1975 numerical inaccuracy",
                 ],
+                "published_sr": {
+                    "criterion": "Sr",
+                    "initial": 0.661438,
+                    "with_scaling": [
+                        {
+                            "iteration": 1,
+                            "after_rotation": 0.657312,
+                            "after_scaling": 0.616714,
+                        },
+                        {
+                            "iteration": 2,
+                            "after_rotation": 0.616620,
+                            "after_scaling": 0.604215,
+                        },
+                        {
+                            "iteration": 3,
+                            "after_rotation": 0.604201,
+                            "after_scaling": 0.600456,
+                        },
+                        {
+                            "iteration": 4,
+                            "after_rotation": 0.600452,
+                            "after_scaling": 0.599322,
+                        },
+                        {
+                            "iteration": 5,
+                            "after_rotation": 0.599322,
+                            "after_scaling": 0.598978,
+                        },
+                        {
+                            "iteration": 6,
+                            "after_rotation": 0.598980,
+                            "after_scaling": 0.598875,
+                        },
+                        {
+                            "iteration": 7,
+                            "after_rotation": 0.598877,
+                            "after_scaling": 0.598842,
+                        },
+                    ],
+                    "without_scaling": [
+                        {"iteration": 0, "after_rotation": 0.661438},
+                        {"iteration": 1, "after_rotation": 0.657312},
+                        {"iteration": 2, "after_rotation": 0.657158},
+                        {"iteration": 3, "after_rotation": 0.657137},
+                    ],
+                },
             },
-            "notes": "Do not invent published digits. Transcribe Table 1 configurations and Table 2 residual history from the 1975 paper before treating this fixture as an oracle.",
+            "notes": (
+                "Transcribed from Table 2 (9 carcasses x 7 characters, three judges) "
+                "and Table 5 (successive Sr). Table 1 in the paper is the ANOVA layout, "
+                "not the coordinates. gpa() uses consensus-first BCD and need not "
+                "reproduce Gower's 1975 iteration path."
+            ),
         }
     )
 

@@ -7,13 +7,13 @@
 weighted_col_sums(X, w)
 }
 \arguments{
-\item{X}{Matrix-like object, \(n \times d\).}
+\item{X}{Matrix-like object, \eqn{n \times d}.}
 
-\item{w}{Nonnegative row weights of length \(n\).}
+\item{w}{Nonnegative row weights of length \eqn{n}.}
 }
 \value{
-Numeric vector of length \(d\).
+Numeric vector of length \eqn{d}.
 }
 \description{
-Computes \(X^\top w\) for a vector of row weights.
+Computes \eqn{X^\top w} for a vector of row weights.
 }

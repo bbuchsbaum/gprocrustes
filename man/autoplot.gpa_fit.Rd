@@ -2,7 +2,8 @@
 % Please edit documentation in R/plotting.R
 \name{autoplot.gpa_fit}
 \alias{autoplot.gpa_fit}
-\title{ggplot2 diagnostics for a \code{gpa_fit}.}
+\alias{autoplot.proc_inference}
+\title{ggplot2 diagnostics for a \code{gpa_fit} or \code{proc_inference}.}
 \usage{
 autoplot.gpa_fit(
   object,
@@ -10,9 +11,11 @@ autoplot.gpa_fit(
     "support", "weights", "uncertainty", "deformation", "cv"),
   ...
 )
+
+autoplot.proc_inference(object, type = "uncertainty", ...)
 }
 \arguments{
-\item{object}{A \code{gpa_fit}.}
+\item{object}{A \code{gpa_fit} or \code{proc_inference}.}
 
 \item{type}{Plot type; see \code{plot_data()}.}
 
@@ -22,5 +25,5 @@ autoplot.gpa_fit(
 A ggplot object.
 }
 \description{
-ggplot2 diagnostics for a \code{gpa_fit}.
+ggplot2 diagnostics for a \code{gpa_fit} or \code{proc_inference}.
 }

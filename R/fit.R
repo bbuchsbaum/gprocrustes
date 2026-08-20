@@ -45,16 +45,35 @@ summary.gpa_fit <- function(object, ...) {
 }
 
 #' Consensus matrix.
+#'
 #' @param object A `gpa_fit`.
+#' @param gauge `"native"` for the optimizer's representative,
+#'   `"canonical"` for a principal-axis presentation, or a reference
+#'   `gpa_fit` / matrix to align to. Canonicalization is display, not estimation.
 #' @param ... Unused.
+#' @return The consensus matrix in the requested gauge.
 #' @export
-consensus <- function(object, ...) {
+consensus <- function(object, gauge = "native", ...) {
   UseMethod("consensus")
 }
 
 #' @export
-consensus.gpa_fit <- function(object, ...) {
-  object$consensus
+consensus.gpa_fit <- function(object, gauge = "native", ...) {
+  M <- object$consensus
+  if (inherits(gauge, "gpa_fit") || is.matrix(gauge)) {
+    ref <- if (inherits(gauge, "gpa_fit")) gauge$consensus else as.matrix(gauge)
+    grp <- if (identical(object$problem$transform$group, "SO")) "SO" else "O"
+    pair <- procrustes(M, ref, transform = proc_orthogonal(grp))
+    return(M %*% pair$transform$R)
+  }
+  gauge <- as.character(gauge)[1L]
+  if (identical(gauge, "native")) {
+    return(M)
+  }
+  if (identical(gauge, "canonical")) {
+    return(.gproc_canonical_consensus(M, object$problem$transform$group))
+  }
+  .gproc_stop("invalid_problem", "gauge must be 'native', 'canonical', or a reference.")
 }
 
 #' Fitted transforms.
@@ -80,7 +99,14 @@ aligned <- function(object, ...) {
 
 #' @export
 aligned.gpa_fit <- function(object, ...) {
-  object$aligned_store
+  store <- object$aligned_store
+  if (identical(object$keep_aligned, "materialize")) {
+    lapply(store, function(v) {
+      if (inherits(v, "proc_aligned_view")) as.matrix(v) else v
+    })
+  } else {
+    store
+  }
 }
 
 #' @export
@@ -105,7 +131,7 @@ residuals.gpa_fit <- function(object, level = c("landmark", "configuration"), ..
 .gproc_fitted_global <- function(object) {
   n <- nrow(object$consensus)
   d <- ncol(object$consensus)
-  lapply(aligned(object), function(v) {
+  lapply(object$aligned_store, function(v) {
     if (inherits(v, "proc_aligned_view")) {
       return(.gproc_scatter_aligned(v, n, d))
     }
@@ -183,14 +209,15 @@ diagnose.gpa_fit <- function(object, ...) {
     certificate = object$certificate,
     scale_mode = object$gauge$scale_mode %||% object$gauge$spec$scale,
     folding = object$folding,
-    reference_covariance = object$reference_covariance
+    reference_covariance = object$reference_covariance,
+    tied_axis_blocks = object$gauge$tied_axis_blocks %||% tied_axis_blocks(object$consensus)
   )
 }
 
-#' Datum-space error \(\sum_i\|X_i-T_i^{-1}(P_iM)\|^2\).
+#' Datum-space error \eqn{\sum_i\|X_i-T_i^{-1}(P_iM)\|^2}.
 #'
 #' Distinct from the reference-space objective. Unavailable when the
-#' transform has no exact inverse (math §34).
+#' transform has no exact inverse (math section 34).
 #'
 #' @param object A `gpa_fit`.
 #' @export
@@ -207,12 +234,21 @@ datum_space_error <- function(object) {
   }
   M <- consensus(object)
   trs <- transformations(object)
-  av <- aligned(object)
+  av <- object$aligned_store
+  raw <- object$raw_data
   f <- 0
   for (nm in names(trs)) {
-    X <- if (inherits(av[[nm]], "proc_aligned_view")) av[[nm]]$x else av[[nm]]
+    if (!is.null(raw) && inherits(raw, "proc_data")) {
+      X <- raw$views[[nm]]
+      map <- raw$row_map[[nm]]
+    } else if (inherits(av[[nm]], "proc_aligned_view")) {
+      X <- av[[nm]]$x
+      map <- av[[nm]]$row_map
+    } else {
+      X <- av[[nm]]
+      map <- seq_len(nrow(X))
+    }
     inv <- inverse_proc_transform(trs[[nm]])
-    map <- if (inherits(av[[nm]], "proc_aligned_view")) av[[nm]]$row_map else seq_len(nrow(X))
     pred <- apply_proc_transform(inv, M[map, , drop = FALSE])
     f <- f + sum((as.matrix(X) - pred)^2)
   }
@@ -221,12 +257,12 @@ datum_space_error <- function(object) {
 
 #' Held-out CV over a smoothness grid for LBW / TPS.
 #'
-#' Training residual always falls as \(\mu\downarrow\). Use this, not \(L_r\),
+#' Training residual always falls as \eqn{\mu\downarrow}. Use this, not \eqn{L_r},
 #' to choose bending energy.
 #'
 #' @param data `proc_data` or a list of matrices.
 #' @param transform An LBW / TPS / affine spec.
-#' @param smoothness Candidate \(\mu\) values.
+#' @param smoothness Candidate \eqn{\mu} values.
 #' @param folds Landmark folds.
 #' @param ... Passed to `gpa()`.
 #' @export
@@ -291,7 +327,7 @@ certify.proc_pair_fit <- function(object, ...) {
 #' @param weights Configuration weights.
 #' @param ... Unused.
 #' @export
-decompose <- function(object, ...) {
+decompose <- function(object, consensus = NULL, weights = NULL, ...) {
   UseMethod("decompose")
 }
 
@@ -349,13 +385,15 @@ canonicalize <- function(object, ...) {
 
 #' @export
 canonicalize.gpa_fit <- function(object, ...) {
-  M <- consensus(object)
-  sv <- .gproc_svd(M, nu = ncol(M), nv = ncol(M))
-  Q <- sv$v
-  if (det(Q) < 0 && identical(object$problem$transform$group, "SO")) {
-    Q[, ncol(Q)] <- -Q[, ncol(Q)]
-  }
-  align_gauge(object, Q)
+  M <- object$consensus
+  Mc <- .gproc_canonical_consensus(M, object$problem$transform$group)
+  pair <- procrustes(M, Mc, transform = proc_orthogonal(
+    if (identical(object$problem$transform$group, "SO")) "SO" else "O"
+  ))
+  out <- align_gauge(object, pair$transform$R)
+  out$gauge$tied_axis_blocks <- tied_axis_blocks(Mc)
+  out$gauge$canonicalization <- "principal_axes"
+  out
 }
 
 #' Right-multiply a fit by a common orthogonal `Q`.
@@ -369,12 +407,18 @@ align_gauge <- function(x, reference) {
 
 #' @export
 align_gauge.gpa_fit <- function(x, reference) {
+  grp <- if (identical(x$problem$transform$group, "SO")) "SO" else "O"
   if (inherits(reference, "gpa_fit")) {
-    pair <- procrustes(consensus(x), consensus(reference), transform = proc_orthogonal("O"))
+    pair <- procrustes(
+      consensus(x),
+      consensus(reference),
+      transform = proc_orthogonal(grp)
+    )
     Q <- pair$transform$R
   } else {
     Q <- as.matrix(reference)
   }
+  .gproc_check_gauge_Q(Q, x)
   x$consensus <- x$consensus %*% Q
   x$transformations <- lapply(x$transformations, function(tr) {
     tr$R <- tr$R %*% Q
@@ -388,15 +432,45 @@ align_gauge.gpa_fit <- function(x, reference) {
     }
     tr
   })
-  if (identical(x$keep_aligned, "lazy")) {
-    x$aligned_store <- lapply(names(x$aligned_store), function(nm) {
-      v <- x$aligned_store[[nm]]
+  x$aligned_store <- lapply(names(x$aligned_store), function(nm) {
+    v <- x$aligned_store[[nm]]
+    if (inherits(v, "proc_aligned_view")) {
       v$transform <- x$transformations[[nm]]
-      v
-    })
-    names(x$aligned_store) <- names(x$transformations)
-  }
+    } else if (is.matrix(v)) {
+      v <- v %*% Q
+    }
+    v
+  })
+  names(x$aligned_store) <- names(x$transformations)
   x
+}
+
+#' @noRd
+.gproc_check_gauge_Q <- function(Q, fit) {
+  d <- ncol(fit$consensus)
+  if (!is.matrix(Q) || nrow(Q) != d || ncol(Q) != d) {
+    .gproc_stop("invalid_problem", "Gauge matrix Q must be d by d.")
+  }
+  if (sqrt(sum((crossprod(Q) - diag(d))^2)) > 1e-8) {
+    .gproc_stop("invalid_problem", "Gauge matrix Q must be orthogonal.")
+  }
+  grp <- fit$problem$transform$group
+  if (identical(grp, "SO") && det(Q) < 0) {
+    .gproc_stop("invalid_problem", "An SO(d) fit cannot be right-multiplied by a reflection.")
+  }
+  if (fit$problem$transform$family %in% c("affine", "lbw", "tps")) {
+    lam <- fit$reference_covariance
+    if (!is.null(lam) && length(unique(round(as.numeric(lam), 10))) > 1L) {
+      L <- diag(as.numeric(lam), length(lam), length(lam))
+      if (sqrt(sum((crossprod(Q, L %*% Q) - L)^2)) > 1e-8) {
+        .gproc_stop(
+          "invalid_problem",
+          "Gauge Q must stabilize the declared reference covariance Lambda."
+        )
+      }
+    }
+  }
+  invisible(Q)
 }
 
 #' @export

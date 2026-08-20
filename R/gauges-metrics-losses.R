@@ -13,10 +13,10 @@ proc_gauge <- function(scale = c("gower", "preshape", "fixed_consensus", "none")
 
 #' Superimposition metric / weight channels.
 #'
-#' @param configuration Configuration weights \(\alpha_i\).
+#' @param configuration Configuration weights \eqn{\alpha_i}.
 #' @param landmark Landmark / entity weights.
 #' @param cell Coordinate-specific weights.
-#' @param precision Precision operator \(Q\).
+#' @param precision Precision operator \eqn{Q}.
 #' @export
 proc_metric <- function(configuration = NULL,
                         landmark = NULL,
@@ -90,9 +90,9 @@ proc_tukey <- function(level = "landmark", c = 4.685) {
 #'   and roll it back if the true objective rises.
 #' @param nstart Number of deterministic starts. `2` adds medoid; `3` adds
 #'   spectral. The lowest exact objective is kept.
-#' @param backend `"auto"` forms the small block Gram when \(Kd\) is below
+#' @param backend `"auto"` forms the small block Gram when \eqn{Kd} is below
 #'   `dense_block_threshold`; `"matrix_free"` never does; `"dense"` always does.
-#' @param dense_block_threshold Maximum \(Kd\) for a dense block-Gram eigenstep.
+#' @param dense_block_threshold Maximum \eqn{Kd} for a dense block-Gram eigenstep.
 #' @export
 gpa_control <- function(tolerance = 1e-8,
                         max_iterations = 500L,

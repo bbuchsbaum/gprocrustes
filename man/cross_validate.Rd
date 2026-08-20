@@ -2,7 +2,7 @@
 % Please edit documentation in R/infer.R
 \name{cross_validate}
 \alias{cross_validate}
-\title{Landmark-group cross-validation of a GPA fit (math §35, ordinary GPA).}
+\title{Landmark-group cross-validation of a GPA fit (math section 35, ordinary GPA).}
 \usage{
 cross_validate(object, folds = 5L, level = c("landmark", "configuration"))
 }
@@ -11,7 +11,7 @@ cross_validate(object, folds = 5L, level = c("landmark", "configuration"))
 
 \item{folds}{Number of landmark folds, or a list of integer index vectors.}
 
-\item{level}{\code{"landmark"} (Bai–Bartoli held-out entities) or
+\item{level}{\code{"landmark"} (Bai-Bartoli held-out entities) or
 \code{"configuration"} (leave one view out).}
 }
 \description{

@@ -4,24 +4,30 @@
 \alias{infer}
 \title{Statistical inference for a fitted GPA problem.}
 \usage{
-infer(object, ...)
+infer(
+  object,
+  model = proc_shape_model(),
+  method = c("bootstrap", "permutation", "analytic"),
+  n_resamples = 100L,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{gpa_fit}.}
-
-\item{...}{Unused.}
 
 \item{model}{A \code{proc_shape_model}.}
 
 \item{method}{\code{"bootstrap"}, \code{"permutation"}, or \code{"analytic"}.}
 
 \item{n_resamples}{Number of bootstrap or permutation draws.}
+
+\item{...}{Unused.}
 }
 \value{
 A \code{proc_inference} object.
 }
 \description{
 Fitting and inference are separate. Bootstrap replicates are gauge-aligned
-to the original consensus before any coordinatewise summary (math §39).
+to the original consensus before any coordinatewise summary (math section 39).
 Analytic standard errors are a declared tangent-space approximation.
 }

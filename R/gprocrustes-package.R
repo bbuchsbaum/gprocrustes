@@ -11,3 +11,5 @@
 #' @importFrom stats coef fitted predict residuals setNames
 #' @importFrom utils packageVersion
 "_PACKAGE"
+
+utils::globalVariables(".data")

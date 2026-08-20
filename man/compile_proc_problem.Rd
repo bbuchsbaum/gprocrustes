@@ -9,7 +9,10 @@ compile_proc_problem(
   transform = proc_similarity(),
   gauge = proc_gauge(scale = "none"),
   metric = proc_metric(),
-  loss = proc_squared_l2()
+  loss = proc_squared_l2(),
+  anchor = NULL,
+  allow_disconnected = FALSE,
+  solver = "auto"
 )
 }
 \arguments{
@@ -22,6 +25,12 @@ compile_proc_problem(
 \item{metric}{Metric.}
 
 \item{loss}{Loss.}
+
+\item{anchor}{Optional fixed view name.}
+
+\item{allow_disconnected}{If \code{TRUE}, a disconnected overlap graph is not fatal.}
+
+\item{solver}{Requested engine or \code{"auto"}.}
 }
 \description{
 Compile a problem into planner input.

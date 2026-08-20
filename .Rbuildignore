@@ -8,3 +8,6 @@
 ^AGENTS\.md$
 ^CLAUDE\.md$
 ^\.github$
+^\.rcmdcheck_result\.rds$
+^.*\.Rcheck$
+^\.oracle-gprocrustes-1\.0-review\.md$

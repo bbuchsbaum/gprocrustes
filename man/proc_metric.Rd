@@ -20,13 +20,13 @@ proc_weights(
 )
 }
 \arguments{
-\item{configuration}{Configuration weights \(\alpha_i\).}
+\item{configuration}{Configuration weights \eqn{\alpha_i}.}
 
 \item{landmark}{Landmark / entity weights.}
 
 \item{cell}{Coordinate-specific weights.}
 
-\item{precision}{Precision operator \(Q\).}
+\item{precision}{Precision operator \eqn{Q}.}
 }
 \description{
 Superimposition metric / weight channels.

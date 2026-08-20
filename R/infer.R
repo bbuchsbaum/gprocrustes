@@ -1,11 +1,11 @@
 #' Declared statistical model for inference after fitting.
 #'
-#' \(\Sigma_M\) is the model covariance. It is not used by `gpa()` unless the
+#' \eqn{\Sigma_M} is the model covariance. It is not used by `gpa()` unless the
 #' user also put it in `proc_metric(precision=)` as a superimposition metric.
 #'
 #' @param covariance A `proc_covariance`, typically `kind = "model"`.
 #' @param resampling `"entities"` (paired row bootstrap) or `"configurations"`.
-#' @param use_fitting_metric If `TRUE`, analytic / tangent \(Q\) is \(\Sigma_S\)
+#' @param use_fitting_metric If `TRUE`, analytic / tangent \eqn{Q} is \eqn{\Sigma_S}
 #'   from the fit. The default is to use `covariance` only.
 #' @export
 proc_shape_model <- function(covariance = proc_covariance(kind = "model"),
@@ -28,7 +28,7 @@ proc_shape_model <- function(covariance = proc_covariance(kind = "model"),
 #' Statistical inference for a fitted GPA problem.
 #'
 #' Fitting and inference are separate. Bootstrap replicates are gauge-aligned
-#' to the original consensus before any coordinatewise summary (math §39).
+#' to the original consensus before any coordinatewise summary (math section 39).
 #' Analytic standard errors are a declared tangent-space approximation.
 #'
 #' @param object A `gpa_fit`.
@@ -38,7 +38,11 @@ proc_shape_model <- function(covariance = proc_covariance(kind = "model"),
 #' @param ... Unused.
 #' @return A `proc_inference` object.
 #' @export
-infer <- function(object, ...) {
+infer <- function(object,
+                  model = proc_shape_model(),
+                  method = c("bootstrap", "permutation", "analytic"),
+                  n_resamples = 100L,
+                  ...) {
   UseMethod("infer")
 }
 
@@ -61,7 +65,7 @@ infer.gpa_fit <- function(object,
   )
 }
 
-#' Landmark-group cross-validation of a GPA fit (math §35, ordinary GPA).
+#' Landmark-group cross-validation of a GPA fit (math section 35, ordinary GPA).
 #'
 #' Held-out landmarks are predicted from a refit that never saw them. The
 #' cross-validation consensus is gauge-aligned to the full consensus before
@@ -69,7 +73,7 @@ infer.gpa_fit <- function(object,
 #'
 #' @param object A `gpa_fit`.
 #' @param folds Number of landmark folds, or a list of integer index vectors.
-#' @param level `"landmark"` (Bai–Bartoli held-out entities) or
+#' @param level `"landmark"` (Bai-Bartoli held-out entities) or
 #'   `"configuration"` (leave one view out).
 #' @export
 cross_validate <- function(object, folds = 5L, level = c("landmark", "configuration")) {
@@ -203,7 +207,10 @@ print.proc_cv <- function(x, ...) {
 
 #' @noRd
 .gproc_data_from_fit <- function(object) {
-  av <- aligned(object)
+  if (!is.null(object$raw_data) && inherits(object$raw_data, "proc_data")) {
+    return(object$raw_data)
+  }
+  av <- object$aligned_store
   views <- lapply(av, function(v) {
     if (inherits(v, "proc_aligned_view")) v$x else as.matrix(v)
   })
@@ -403,7 +410,7 @@ print.proc_cv <- function(x, ...) {
         if (isTRUE(model$use_fitting_metric))
           "Q is the superimposition metric (user declaration)"
         else
-          "Q is the model covariance, not automatically Σ_S"
+          "Q is the model covariance, not automatically Sigma_S"
       )
     ),
     class = "proc_inference"

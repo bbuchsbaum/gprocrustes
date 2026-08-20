@@ -4,15 +4,19 @@
 \alias{proc_moments}
 \title{Pairwise sufficient statistics used by the Procrustes kernel.}
 \usage{
-proc_moments(X, Y, w = NULL)
+proc_moments(X, Y, w = NULL, center = TRUE)
 }
 \arguments{
 \item{X, Y}{Matrix-like objects with the same number of rows.}
 
 \item{w}{Nonnegative row weights. Recycled to 1 if omitted.}
+
+\item{center}{If \code{TRUE}, return translation-eliminated moments
+\eqn{X_c^\top W Y_c}. If \code{FALSE}, return the raw moments
+\eqn{X^\top W Y} used when translation is prohibited.}
 }
 \value{
-A list with \code{C}, \code{a}, \code{b}, \code{xbar}, \code{ybar}, and \code{w_sum}.
+A list with \code{C}, \code{a}, \code{b}, \code{xbar}, \code{ybar}, \code{w_sum}, and \code{centered}.
 }
 \description{
 Pairwise sufficient statistics used by the Procrustes kernel.

@@ -46,13 +46,13 @@ proc_signed_permutation <- function() {
   )
 }
 
-#' Affine maps under Bai–Bartoli reference-space constraints.
+#' Affine maps under Bai-Bartoli reference-space constraints.
 #'
-#' Right action \(T(X)=XA+\mathbf{1}t\), written as an LBW with a homogeneous
-#' column. `reference_covariance` is \(\Lambda\) in \(M^\top M=\Lambda\).
+#' Right action \eqn{T(X)=XA+\mathbf{1}t}, written as an LBW with a homogeneous
+#' column. `reference_covariance` is \eqn{\Lambda} in \eqn{M^\top M=\Lambda}.
 #' It is a modeling choice, never estimated invisibly.
 #'
-#' @param reference_covariance Scalar or length-\(d\) vector \(\lambda\).
+#' @param reference_covariance Scalar or length-\eqn{d} vector \eqn{\lambda}.
 #' @export
 proc_affine <- function(reference_covariance = 1) {
   structure(
@@ -69,12 +69,12 @@ proc_affine <- function(reference_covariance = 1) {
   )
 }
 
-#' Linear-basis warp: \(T(X)=\Phi B\) with quadratic penalty \(\operatorname{tr}(B^\top LB)\).
+#' Linear-basis warp: \eqn{T(X)=\Phi B} with quadratic penalty \eqn{\operatorname{tr}(B^\top LB)}.
 #'
-#' @param basis Function `function(X)` returning \(\Phi\), or `"affine"`.
-#' @param penalty Symmetric penalty \(L\), a function of \(\Phi\), or `NULL`.
-#' @param smoothness Multiplier \(\mu\ge 0\).
-#' @param reference_covariance \(\Lambda\) in \(M^\top M=\Lambda\).
+#' @param basis Function `function(X)` returning \eqn{\Phi}, or `"affine"`.
+#' @param penalty Symmetric penalty \eqn{L}, a function of \eqn{\Phi}, or `NULL`.
+#' @param smoothness Multiplier \eqn{\mu\ge 0}.
+#' @param reference_covariance \eqn{\Lambda} in \eqn{M^\top M=\Lambda}.
 #' @export
 proc_lbw <- function(basis,
                      penalty = NULL,
@@ -100,8 +100,8 @@ proc_lbw <- function(basis,
 #'
 #' @param control_points Optional shared control-point matrix. `NULL` uses
 #'   each view's observed landmarks.
-#' @param smoothness Bending-energy weight \(\mu\).
-#' @param reference_covariance \(\Lambda\) in \(M^\top M=\Lambda\).
+#' @param smoothness Bending-energy weight \eqn{\mu}.
+#' @param reference_covariance \eqn{\Lambda} in \eqn{M^\top M=\Lambda}.
 #' @export
 proc_tps <- function(control_points = NULL,
                      smoothness = 1,
@@ -189,10 +189,10 @@ proc_identity <- function(spec, d) {
   )
 }
 
-#' Apply a fitted transform: \(T(X) = sXR + \mathbf{1}t\).
+#' Apply a fitted transform: \eqn{T(X) = sXR + \mathbf{1}t}.
 #'
 #' @param tr A `proc_fitted_transform`.
-#' @param X An \(n \times d\) matrix-like object.
+#' @param X An \eqn{n \times d} matrix-like object.
 #' @return The transformed matrix (dense if `R` mixes sparse columns).
 #' @export
 apply_proc_transform <- function(tr, X) {
@@ -257,11 +257,48 @@ compose_proc_transform <- function(tr1, tr2) {
   R <- tr1$R %*% tr2$R
   s <- tr1$s * tr2$s
   t <- as.numeric(tr2$s * tr1$t %*% tr2$R + tr2$t)
-  spec <- tr2$spec
-  if (tr1$spec$group == "SO" && tr2$spec$group == "SO") {
-    spec$group <- "SO"
-  }
+  spec <- .gproc_composed_spec(tr1, tr2, R, s, t)
   .proc_fitted(spec = spec, R = R, s = s, t = t)
+}
+
+#' Spec of the composed action, not a copy of `tr2$spec`.
+#'
+#' @noRd
+.gproc_composed_spec <- function(tr1, tr2, R, s, t) {
+  g1 <- tr1$spec$group
+  g2 <- tr2$spec$group
+  detR <- if (is.matrix(R) && nrow(R) == ncol(R) && nrow(R) > 0L) det(R) else 1
+  so <- identical(g1, "SO") && identical(g2, "SO") && is.finite(detR) && detR > 0
+  group <- if (g1 %in% c("O", "SO") && g2 %in% c("O", "SO")) {
+    if (so) "SO" else "O"
+  } else {
+    g2
+  }
+  if (is.finite(detR) && detR < 0 && identical(group, "SO")) {
+    group <- "O"
+  }
+  has_s <- abs(s - 1) > 1e-12 ||
+    identical(tr1$spec$scaling, "isotropic") ||
+    identical(tr2$spec$scaling, "isotropic")
+  has_t <- any(abs(t) > 1e-12) ||
+    isTRUE(tr1$spec$translation) ||
+    isTRUE(tr2$spec$translation)
+  if (identical(tr1$spec$family, "signed_permutation") &&
+      identical(tr2$spec$family, "signed_permutation") && !has_s && !has_t) {
+    return(proc_signed_permutation())
+  }
+  if (has_s || has_t) {
+    g <- if (group %in% c("O", "SO")) group else "O"
+    return(proc_similarity(
+      group = g,
+      translation = has_t,
+      scaling = if (has_s) "isotropic" else "none"
+    ))
+  }
+  if (group %in% c("O", "SO")) {
+    return(proc_orthogonal(group))
+  }
+  tr2$spec
 }
 
 #' @keywords internal
@@ -321,7 +358,7 @@ degrees_of_freedom <- function(spec, d) {
   as.integer(rot + sc + tr)
 }
 
-#' Constraint residual \(\|R^\top R - I\|_F\) (and det for SO).
+#' Constraint residual \eqn{\|R^\top R - I\|_F} (and det for SO).
 #'
 #' @param tr Fitted transform.
 #' @export

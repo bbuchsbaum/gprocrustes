@@ -1,14 +1,14 @@
 #' Superimposition or model covariance.
 #'
-#' \(\Sigma_S\) is the metric used to fit. \(\Sigma_M\) is reserved for
+#' \eqn{\Sigma_S} is the metric used to fit. \eqn{\Sigma_M} is reserved for
 #' inference and is not used by the solvers. A Kronecker structure
-#' \(\Sigma_N\otimes\Sigma_d\) is the small set the package implements.
-#' If \(\Sigma_d\propto I\), entity whitening or landmark weights recover
+#' \eqn{\Sigma_N\otimes\Sigma_d} is the small set the package implements.
+#' If \eqn{\Sigma_d\propto I}, entity whitening or landmark weights recover
 #' the exact SVD path. A genuine coordinate metric does not.
 #'
-#' @param entity Landmark / entity factor \(\Sigma_N\) or its precision.
-#' @param coordinate Coordinate factor \(\Sigma_d\) or its precision.
-#' @param kind `"superimposition"` (\(\Sigma_S\)) or `"model"` (\(\Sigma_M\)).
+#' @param entity Landmark / entity factor \eqn{\Sigma_N} or its precision.
+#' @param coordinate Coordinate factor \eqn{\Sigma_d} or its precision.
+#' @param kind `"superimposition"` (\eqn{\Sigma_S}) or `"model"` (\eqn{\Sigma_M}).
 #' @param as_precision If `TRUE`, `entity` / `coordinate` are precisions.
 #' @export
 proc_covariance <- function(entity = NULL,

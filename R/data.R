@@ -53,7 +53,7 @@ proc_data <- function(views, ids = NULL, observed = NULL, cells = NULL, metadata
 
 #' Domain adapter: a 3-way entity-by-dimension-by-view array.
 #'
-#' @param x An array with dimensions \((n, d, K)\) or a list of matrices.
+#' @param x An array with dimensions \eqn{(n, d, K)} or a list of matrices.
 #' @param view_names Optional view names.
 #' @export
 proc_from_array <- function(x, view_names = NULL) {

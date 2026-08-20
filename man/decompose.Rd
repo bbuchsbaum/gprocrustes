@@ -4,16 +4,16 @@
 \alias{decompose}
 \title{Energy decomposition of aligned configurations.}
 \usage{
-decompose(object, ...)
+decompose(object, consensus = NULL, weights = NULL, ...)
 }
 \arguments{
 \item{object}{A \code{gpa_fit}, or a list of aligned matrices when \code{consensus} is supplied.}
 
-\item{...}{Unused.}
-
 \item{consensus}{Optional consensus matrix.}
 
 \item{weights}{Configuration weights.}
+
+\item{...}{Unused.}
 }
 \description{
 Energy decomposition of aligned configurations.

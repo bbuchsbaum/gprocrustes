@@ -1,7 +1,7 @@
-#' Nuisance / orbit tangent basis at a consensus (math §§25–26).
+#' Nuisance / orbit tangent basis at a consensus (math sections 25-26).
 #'
-#' Columns are \(\operatorname{vec}(\mathbf{1}e_k^\top)\), \(\operatorname{vec}(M)\)
-#' when scale is free, and \(\operatorname{vec}(MA)\) for a skew-symmetric basis.
+#' Columns are \eqn{\operatorname{vec}(\mathbf{1}e_k^\top)}, \eqn{\operatorname{vec}(M)}
+#' when scale is free, and \eqn{\operatorname{vec}(MA)} for a skew-symmetric basis.
 #'
 #' @noRd
 .gproc_nuisance_basis <- function(M, spec) {
@@ -35,7 +35,7 @@
   do.call(cbind, cols)
 }
 
-#' Apply Kronecker precision \(Q=\Sigma_d^{-1}\otimes\Sigma_N^{-1}\) to \(\operatorname{vec}(Z)\).
+#' Apply Kronecker precision \eqn{Q=\Sigma_d^{-1}\otimes\Sigma_N^{-1}} to \eqn{\operatorname{vec}(Z)}.
 #'
 #' @noRd
 .gproc_apply_vec_precision <- function(z, n, d, covar) {
@@ -59,7 +59,7 @@
   as.vector(We %*% Z %*% Wd)
 }
 
-#' Horizontal projection \(z_H=P_H\operatorname{vec}(Z)\) at \(M\).
+#' Horizontal projection \eqn{z_H=P_H\operatorname{vec}(Z)} at \eqn{M}.
 #'
 #' @noRd
 .gproc_horizontal_project <- function(Z, M, spec, covar = NULL) {
@@ -92,12 +92,12 @@
 #' at the consensus. The result is a local chart, not a global shape space.
 #'
 #' @param object A `gpa_fit`.
-#' @param model Optional `proc_shape_model` whose covariance supplies \(Q\).
-#'   Fitting-metric \(Q\) is used only if the model says so.
+#' @param model Optional `proc_shape_model` whose covariance supplies \eqn{Q}.
+#'   Fitting-metric \eqn{Q} is used only if the model says so.
 #' @param ... Unused.
 #' @return A list of entity-by-dimension tangent residual matrices.
 #' @export
-tangent_coordinates <- function(object, ...) {
+tangent_coordinates <- function(object, model = NULL, ...) {
   UseMethod("tangent_coordinates")
 }
 
@@ -121,7 +121,7 @@ tangent_coordinates.gpa_fit <- function(object, model = NULL, ...) {
 #'
 #' @param newdata A residual matrix, a configuration, or `proc_data` with one view.
 #' @param fit A `gpa_fit` that supplies the consensus and gauge.
-#' @param as_residual If `TRUE`, `newdata` is already \(Y-M\). If `FALSE`,
+#' @param as_residual If `TRUE`, `newdata` is already \eqn{Y-M}. If `FALSE`,
 #'   it is aligned to the consensus first.
 #' @export
 tangent_project <- function(newdata, fit, as_residual = FALSE) {

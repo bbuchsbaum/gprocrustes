@@ -2,7 +2,7 @@
 % Please edit documentation in R/fit.R
 \name{datum_space_error}
 \alias{datum_space_error}
-\title{Datum-space error \(\sum_i\|X_i-T_i^{-1}(P_iM)\|^2\).}
+\title{Datum-space error \eqn{\sum_i\|X_i-T_i^{-1}(P_iM)\|^2}.}
 \usage{
 datum_space_error(object)
 }
@@ -11,5 +11,5 @@ datum_space_error(object)
 }
 \description{
 Distinct from the reference-space objective. Unavailable when the
-transform has no exact inverse (math §34).
+transform has no exact inverse (math section 34).
 }

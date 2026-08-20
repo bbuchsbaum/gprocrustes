@@ -2,18 +2,18 @@
 % Please edit documentation in R/transforms.R
 \name{apply_proc_transform}
 \alias{apply_proc_transform}
-\title{Apply a fitted transform: \(T(X) = sXR + \mathbf{1}t\).}
+\title{Apply a fitted transform: \eqn{T(X) = sXR + \mathbf{1}t}.}
 \usage{
 apply_proc_transform(tr, X)
 }
 \arguments{
 \item{tr}{A \code{proc_fitted_transform}.}
 
-\item{X}{An \(n \times d\) matrix-like object.}
+\item{X}{An \eqn{n \times d} matrix-like object.}
 }
 \value{
 The transformed matrix (dense if \code{R} mixes sparse columns).
 }
 \description{
-Apply a fitted transform: \(T(X) = sXR + \mathbf{1}t\).
+Apply a fitted transform: \eqn{T(X) = sXR + \mathbf{1}t}.
 }

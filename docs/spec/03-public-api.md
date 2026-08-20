@@ -121,7 +121,7 @@ Generalized Procrustes fit
 print(fit)
 summary(fit)
 
-consensus(fit)
+consensus(fit, gauge = "native") # or "canonical", or a reference fit/matrix
 transformations(fit)
 aligned(fit)                    # lazy proc_aligned_view
 fitted(fit)

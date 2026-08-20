@@ -15,10 +15,10 @@ proc_shape_model(
 
 \item{resampling}{\code{"entities"} (paired row bootstrap) or \code{"configurations"}.}
 
-\item{use_fitting_metric}{If \code{TRUE}, analytic / tangent \(Q\) is \(\Sigma_S\)
+\item{use_fitting_metric}{If \code{TRUE}, analytic / tangent \eqn{Q} is \eqn{\Sigma_S}
 from the fit. The default is to use \code{covariance} only.}
 }
 \description{
-\(\Sigma_M\) is the model covariance. It is not used by \code{gpa()} unless the
+\eqn{\Sigma_M} is the model covariance. It is not used by \code{gpa()} unless the
 user also put it in \code{proc_metric(precision=)} as a superimposition metric.
 }

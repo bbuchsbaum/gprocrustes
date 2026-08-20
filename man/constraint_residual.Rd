@@ -2,7 +2,7 @@
 % Please edit documentation in R/transforms.R
 \name{constraint_residual}
 \alias{constraint_residual}
-\title{Constraint residual \(\|R^\top R - I\|_F\) (and det for SO).}
+\title{Constraint residual \eqn{\|R^\top R - I\|_F} (and det for SO).}
 \usage{
 constraint_residual(tr)
 }
@@ -10,5 +10,5 @@ constraint_residual(tr)
 \item{tr}{Fitted transform.}
 }
 \description{
-Constraint residual \(\|R^\top R - I\|_F\) (and det for SO).
+Constraint residual \eqn{\|R^\top R - I\|_F} (and det for SO).
 }

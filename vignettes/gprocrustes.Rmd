@@ -1,0 +1,223 @@
+---
+title: "Aligning landmark configurations"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Aligning landmark configurations}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6,
+  fig.height = 4,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r load}
+library(gprocrustes)
+```
+
+You have the same landmarks recorded more than once: different sessions,
+sites, or observers, each in its own pose. You want one shared shape
+and a record of how each recording was moved onto it.
+
+Rows are entities (landmarks). Columns are dimensions. The package
+moves a configuration by the right action $T(X)=sXR+\mathbf{1}t$.
+
+## Can I see a shared shape first?
+
+Three noisy copies of an eight-landmark outline. One is rotated and
+translated; one is also scaled.
+
+```{r make-recordings}
+set.seed(1)
+shape <- matrix(
+  c(0, 0, 1, 0.1, 1.4, 0.8, 1, 1.4, 0.2, 1.5, -0.2, 1, -0.3, 0.4, 0.2, -0.1),
+  8, 2, byrow = TRUE
+)
+shape <- scale(shape, scale = FALSE)
+rot <- function(th) matrix(c(cos(th), sin(th), -sin(th), cos(th)), 2, 2)
+recordings <- list(
+  site_a = shape + matrix(rnorm(16, sd = 0.03), 8, 2),
+  site_b = shape %*% rot(0.8) + matrix(c(0.4, -0.2), 8, 2, byrow = TRUE) +
+    matrix(rnorm(16, sd = 0.03), 8, 2),
+  site_c = 1.35 * (shape %*% rot(-0.5)) + matrix(c(-0.3, 0.5), 8, 2, byrow = TRUE) +
+    matrix(rnorm(16, sd = 0.03), 8, 2)
+)
+```
+
+`gpa()` fits a consensus and a transform for each recording.
+
+```{r fit-gpa}
+fit <- gpa(recordings, transform = "similarity")
+fit
+```
+
+```{r check-default-fit, include = FALSE}
+stopifnot(is.finite(fit$objective), fit$objective > 0)
+stopifnot(fit$solver == "gower_bcd")
+stopifnot(fit$optimality_status == "blockwise_stationary")
+stopifnot(identical(certify(fit)$status, "unavailable"))
+stopifnot(is.finite(quotient_distance(consensus(fit), consensus(fit, gauge = "canonical"))))
+```
+
+The overlay is the first thing to look at: aligned recordings around
+the consensus.
+
+```{r plot-overlay}
+plot(fit, type = "overlay")
+```
+
+`consensus()` is a representative of an equivalence class. Changing
+the gauge does not change the residual energy.
+
+```{r gauge-is-presentation}
+native <- consensus(fit, gauge = "native")
+canonical <- consensus(fit, gauge = "canonical")
+c(
+  objective = glance.gpa_fit(fit)$objective,
+  after_canonicalize = glance.gpa_fit(canonicalize(fit))$objective,
+  quotient = quotient_distance(native, canonical)
+)
+```
+
+## What did the engine actually claim?
+
+`gpa()` is a compiler, not a universal optimizer. This similarity
+problem used Gower block-coordinate descent. The allowed claim is
+blockwise stationarity, not a global certificate.
+
+```{r explain-claim}
+explain_solver(fit)
+certify(fit)
+```
+
+`glance()` is the one-row summary of those existing diagnostics.
+`tidy()` is one row per recording: scale and translation already
+stored on the transforms.
+
+```{r broom-tables}
+glance.gpa_fit(fit)
+tidy.gpa_fit(fit)
+```
+
+## What if one recording is a fixed reference?
+
+Two views and an `anchor` use the exact pairwise polar kernel.
+
+```{r pairwise-anchor}
+pair <- gpa(
+  recordings[c("site_a", "site_b")],
+  transform = proc_similarity(group = "SO"),
+  anchor = "site_a"
+)
+c(solver = pair$solver, optimality = pair$optimality_status)
+```
+
+```{r check-pairwise, include = FALSE}
+stopifnot(identical(pair$solver, "pairwise_polar"))
+stopifnot(identical(pair$optimality_status, "exact_closed_form"))
+```
+
+That closed form is also the standalone `procrustes()` kernel.
+
+```{r pairwise-kernel}
+procrustes(
+  recordings$site_b,
+  recordings$site_a,
+  transform = proc_similarity(group = "SO")
+)$optimality_status
+```
+
+## What if one landmark is an outlier?
+
+Squared $L_2$ lets a single bad landmark pull the consensus. Huber
+IRLS down-weights the landmark vector and reports a different claim:
+still stationarity, never Ling's dual certificate.
+
+```{r robust-fit}
+contaminated <- recordings
+contaminated$site_c[3, ] <- contaminated$site_c[3, ] + c(4, -3.5)
+l2 <- gpa(contaminated, transform = proc_orthogonal("O"))
+huber <- gpa(
+  contaminated,
+  transform = proc_orthogonal("O"),
+  loss = proc_huber(k = 0.75)
+)
+aug <- augment.gpa_fit(huber)
+weights_c <- aug$weight[aug$configuration == "site_c"]
+data.frame(
+  engine = c(l2$solver, huber$solver),
+  claim = c(l2$optimality_status, huber$optimality_status),
+  certificate = c(certify(l2)$status, certify(huber)$status),
+  site_c_landmark3_weight = c(NA_real_, weights_c[[3L]])
+)
+```
+
+```{r check-huber, include = FALSE}
+stopifnot(identical(huber$solver, "irls"))
+stopifnot(identical(huber$optimality_status, "blockwise_stationary"))
+stopifnot(identical(certify(huber)$status, "unavailable"))
+stopifnot(weights_c[[3L]] < min(weights_c[-3L]))
+```
+
+The influence plot shows the same weights the IRLS step used.
+
+```{r plot-influence}
+plot(huber, type = "influence")
+```
+
+## What if the recordings differ by more than similarity?
+
+Affine, linear-basis warps, and thin-plate splines are a separate
+engine. They solve a constrained eigenproblem in reference space.
+`reference_covariance` is $\Lambda$ in $M^\top M=\Lambda$. It is a
+modeling choice, never estimated invisibly. Success here is a global
+eigen-solution **for that formulation**, not "GPA is globally solved."
+
+```{r affine-engine}
+aff <- gpa(recordings, transform = proc_affine(reference_covariance = 1))
+c(
+  solver = aff$solver,
+  claim = aff$optimality_status,
+  certificate = certify(aff)$status,
+  lambda = paste(aff$reference_covariance, collapse = ",")
+)
+```
+
+```{r check-affine, include = FALSE}
+stopifnot(identical(aff$solver, "lbw_eigen"))
+stopifnot(identical(aff$optimality_status, "exact_closed_form"))
+stopifnot(!identical(certify(aff)$status, "certified_global"))
+M <- consensus(aff)
+stopifnot(isTRUE(all.equal(unname(diag(crossprod(M))), c(1, 1), tolerance = 1e-6)))
+```
+
+A TPS fit can fold. Affine $\det<0$ is orientation, not folding.
+`datum_space_error()` exists only when the transform has an exact
+inverse; TPS refuses that inverse.
+
+```{r inverse-and-folding}
+tps <- gpa(recordings, transform = proc_tps(smoothness = 1))
+c(
+  affine_datum = datum_space_error(aff),
+  tps_folded = tps$folding$any_folded
+)
+```
+
+```{r tps-inverse, error = TRUE}
+inverse_proc_transform(transformations(tps)[["site_a"]])
+```
+
+## What should I reach for next?
+
+- `?gpa` and `?explain_solver` for engine dispatch
+- `?infer` for bootstrap or tangent standard errors after fitting
+- `?cross_validate` and `?tune_smoothness` for held-out checks
+- `?quotient_distance` when you need a gauge-invariant comparison
+- the guarantee matrix in `docs/spec/01-solver-guarantee-matrix.md`

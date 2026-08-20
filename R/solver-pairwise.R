@@ -1,21 +1,24 @@
 #' Pairwise Procrustes kernel.
 #'
-#' Exact closed-form fit of `X` to `Y` under \(O(d)\), \(SO(d)\), or
+#' Exact closed-form fit of `X` to `Y` under \eqn{O(d)}, \eqn{SO(d)}, or
 #' similarity. Translation is eliminated analytically; centering uses
-#' sufficient statistics and never forms \(X_c\) explicitly.
+#' sufficient statistics and never forms \eqn{X_c} explicitly.
 #'
-#' @param X Source configuration, \(n \times d\).
-#' @param Y Target configuration, \(n \times d\).
+#' @param X Source configuration, \eqn{n \times d}.
+#' @param Y Target configuration, \eqn{n \times d}.
 #' @param transform Transform specification or shortcut.
-#' @param weights Row weights \(w\).
-#' @param rank_tol Relative singular-value threshold \(\tau\).
+#' @param weights Row weights \eqn{w}.
+#' @param rank_tol Relative singular-value threshold \eqn{\tau}.
+#' @param center If `NULL`, translation is eliminated for \(O(d)\) / isotropic
+#'   similarity and stored as \(t^\star\). `FALSE` uses raw moments.
 #' @return A `proc_pair_fit`.
 #' @export
 procrustes <- function(X,
                        Y,
                        transform = proc_orthogonal("O"),
                        weights = NULL,
-                       rank_tol = 1e-10) {
+                       rank_tol = 1e-10,
+                       center = NULL) {
   spec <- as_proc_transform(transform)
   X <- .gproc_as_numeric_matrix(X, "X")
   Y <- .gproc_as_numeric_matrix(Y, "Y")
@@ -34,7 +37,10 @@ procrustes <- function(X,
   if (identical(spec$family, "signed_permutation")) {
     return(.procrustes_signed_perm(X, Y, w, spec, rank_tol))
   }
-  moms <- proc_moments(X, Y, w)
+  if (is.null(center)) {
+    center <- .gproc_eliminates_translation(spec)
+  }
+  moms <- proc_moments(X, Y, w, center = isTRUE(center))
   polar <- .polar_factor(moms$C, group = spec$group, rank_tol = rank_tol)
   R <- polar$R
   gamma <- sum(R * moms$C)
@@ -45,13 +51,13 @@ procrustes <- function(X,
   } else {
     s <- 1
   }
-  t <- if (isTRUE(spec$translation)) {
+  t <- if (isTRUE(center)) {
     as.numeric(moms$ybar - s * (moms$xbar %*% R))
   } else {
     rep(0, length(moms$xbar))
   }
-  objective <- .gproc_centered_residual(X, Y, R, s, w, moms$xbar, moms$ybar)
   tr <- .proc_fitted(spec, R, s, t)
+  objective <- .gproc_transform_residual(X, Y, tr, w)
   structure(
     list(
       transform = tr,
@@ -69,6 +75,15 @@ procrustes <- function(X,
     ),
     class = "proc_pair_fit"
   )
+}
+
+#' Translation is estimated, or eliminated as a gauge, for O(d)/SO(d).
+#'
+#' @noRd
+.gproc_eliminates_translation <- function(spec) {
+  isTRUE(spec$translation) ||
+    identical(spec$family, "orthogonal") ||
+    identical(spec$scaling, "isotropic")
 }
 
 #' Polar / proper-polar factor of a cross-covariance.
@@ -102,63 +117,80 @@ polar_factor <- function(C, group = c("O", "SO"), rank_tol = 1e-10) {
   sigma <- sv$d
   sigma1 <- if (length(sigma)) max(sigma[1L], 0) else 0
   rank <- if (sigma1 <= 0) 0L else as.integer(sum(sigma > rank_tol * sigma1))
-  if (rank == 0L) {
-    R <- diag(d)
-  } else {
+  R_o <- if (rank == 0L) diag(d) else sv$u %*% t(sv$v)
+  flipped <- FALSE
+  if (identical(group, "SO") && rank > 0L && det(R_o) < 0) {
+    sv$u[, d] <- -sv$u[, d]
     R <- sv$u %*% t(sv$v)
-    if (identical(group, "SO") && det(R) < 0) {
-      sv$u[, d] <- -sv$u[, d]
-      R <- sv$u %*% t(sv$v)
-    }
+    flipped <- TRUE
+  } else {
+    R <- R_o
   }
-  unique <- rank == d
+  ident <- .polar_identifiability(sigma, rank, d, group, flipped, rank_tol, sigma1)
   list(
     R = R,
     singular_values = sigma,
     rank = rank,
-    transform_unique = unique,
-    unidentified = as.integer(max(d - rank, 0L))
+    transform_unique = ident$transform_unique,
+    unidentified = ident$unidentified
   )
+}
+
+#' O(d) is unique iff rank(C)=d. SO(d) can identify one extra axis via det=+1.
+#'
+#' @noRd
+.polar_identifiability <- function(sigma, rank, d, group, flipped, rank_tol, sigma1) {
+  if (identical(group, "O")) {
+    return(list(
+      transform_unique = rank == d,
+      unidentified = as.integer(max(d - rank, 0L))
+    ))
+  }
+  last_tie <- d >= 2L && rank == d &&
+    abs(sigma[[d]] - sigma[[d - 1L]]) <= rank_tol * max(sigma1, .Machine$double.eps)
+  unique <- (rank == d && !(isTRUE(flipped) && last_tie)) || rank == d - 1L
+  unidentified <- if (unique) {
+    0L
+  } else {
+    as.integer(max(d - 1L - min(rank, d - 1L), 0L) + 1L)
+  }
+  list(transform_unique = unique, unidentified = unidentified)
 }
 
 #' @keywords internal
 .procrustes_signed_perm <- function(X, Y, w, spec, rank_tol) {
-  # Component matching uses the raw cross-covariance, not the centered one.
-  C <- as.matrix(Matrix::crossprod(X, .gproc_row_scale(Y, w)))
-  moms <- proc_moments(X, Y, w)
-  moms$C <- C
+  moms <- proc_moments(X, Y, w, center = FALSE)
+  C <- moms$C
   d <- ncol(C)
   if (d > 8L) {
     .gproc_stop("invalid_problem", "Signed-permutation brute-force solver supports d <= 8.")
   }
   perms <- .gproc_permutations(d)
-  best_score <- -Inf
-  best_p <- seq_len(d)
-  for (p in perms) {
-    vals <- C[cbind(p, seq_len(d))]
-    score <- sum(abs(vals))
-    if (score > best_score) {
-      best_score <- score
-      best_p <- p
-    }
-  }
+  scores <- vapply(perms, function(p) sum(abs(C[cbind(p, seq_len(d))])), numeric(1))
+  best_i <- which.max(scores)
+  best_p <- perms[[best_i]]
+  best_score <- scores[[best_i]]
+  scale_c <- max(1, max(abs(C)))
+  n_best <- sum(abs(scores - best_score) <= rank_tol * scale_c)
   P <- diag(d)[best_p, , drop = FALSE]
   signs <- sign(C[cbind(best_p, seq_len(d))])
+  zero_sel <- abs(C[cbind(best_p, seq_len(d))]) <= rank_tol * scale_c
   signs[signs == 0] <- 1
   D <- diag(signs, d, d)
   R <- P %*% D
   tr <- .proc_fitted(spec, R, 1, rep(0, d))
+  unique <- n_best == 1L && !any(zero_sel)
   structure(
     list(
       transform = tr,
       moments = moms,
       gamma = sum(R * C),
-      objective = moms$a + moms$b - 2 * sum(R * C),
+      objective = .gproc_transform_residual(X, Y, tr, w),
       rank = .polar_factor(C, "O", rank_tol)$rank,
       singular_values = .gproc_svd(C, nu = 0L, nv = 0L)$d,
-      transform_unique = TRUE,
+      transform_unique = unique,
       objective_unique = TRUE,
-      unidentified_subspace_dimension = 0L,
+      unidentified_subspace_dimension = if (unique) 0L else 1L,
       numerical_status = "exact",
       optimality_status = "exact_closed_form",
       solver = "signed_permutation"

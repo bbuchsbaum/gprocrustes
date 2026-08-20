@@ -29,107 +29,73 @@ gpa <- function(data,
                 anchor = NULL,
                 allow_disconnected = FALSE) {
   spec <- as_proc_transform(transform)
-  if (!inherits(gauge, "proc_gauge")) gauge <- proc_gauge()
-  if (!inherits(metric, "proc_metric")) metric <- proc_metric()
-  if (!inherits(loss, "proc_loss")) loss <- proc_squared_l2()
-  if (!inherits(control, "gpa_control")) control <- gpa_control()
+  .gproc_require_class(gauge, "proc_gauge", "gauge")
+  .gproc_require_class(metric, "proc_metric", "metric")
+  .gproc_require_class(loss, "proc_loss", "loss")
+  .gproc_require_class(control, "gpa_control", "control")
 
   data <- .gproc_as_data(data)
-  ov <- overlap_graph(data)
-  if (ov$n_components > 1L && !isTRUE(allow_disconnected)) {
-    .gproc_stop(
-      "disconnected_overlap_graph",
-      sprintf("Overlap graph has %d connected components.", ov$n_components)
-    )
-  }
-  alphas <- .gproc_config_weights(metric$configuration, names(data$views))
-  if (sum(alphas) <= 0) {
-    .gproc_stop("zero_total_configuration_weight", "All configuration weights are zero.")
-  }
-
-  compiled <- compile_proc_problem(data, spec, gauge, metric, loss)
+  compiled <- compile_proc_problem(
+    data, spec, gauge, metric, loss,
+    anchor = anchor,
+    allow_disconnected = allow_disconnected,
+    solver = solver
+  )
+  ov <- compiled$overlap
   plan <- explain_solver(compiled)
+  plan_use <- .gproc_validate_forced_solver(compiled, solver, plan)
+  alphas <- compiled$configuration_weights
   metric_use <- .gproc_apply_goodall_metric(metric, data)
-  use_pairwise <- .gpa_use_pairwise(data, spec, solver, plan, anchor)
+  use_pairwise <- .gpa_use_pairwise(data, spec, solver, plan_use, anchor)
   if (use_pairwise) {
-    pair_plan <- .gpa_pairwise_plan(spec)
+    pair_plan <- if (plan_use$solver %in% c("pairwise_polar", "signed_permutation")) {
+      plan_use
+    } else {
+      .gpa_pairwise_plan(spec)
+    }
     fit_pair <- .gpa_pairwise(data, spec, metric_use, anchor)
     return(.gpa_from_pairwise(fit_pair, data, spec, gauge, metric_use, loss, compiled,
                               pair_plan, ov, alphas, anchor, control))
   }
-  if (identical(solver, "irls") || (identical(solver, "auto") && identical(plan$solver, "irls"))) {
+  engine <- if (identical(solver, "auto")) plan_use$solver else solver
+  if (identical(engine, "irls")) {
     raw <- .irls_gpa(data, spec, gauge, metric_use, alphas, control, anchor, loss)
-    plan_use <- if (identical(plan$solver, "irls")) plan else {
-      structure(list(solver = "irls", reasons = "solver='irls'",
-                     plan = "landmark-vector IRLS around Gower BCD",
-                     allowed_claim = "blockwise_stationary"),
-                class = "proc_solver_plan")
-    }
     fit <- .gpa_from_gower(raw, data, spec, gauge, metric_use, loss, compiled, plan_use,
                            ov, alphas, anchor, control)
     if (!is.null(raw$landmark_weights)) {
       fit$weights$robust <- raw$landmark_weights
       fit$weights$landmark <- raw$landmark_weights
     }
+    if (!is.null(raw$effective_n)) {
+      fit$weights$effective_n <- raw$effective_n
+    }
     return(fit)
   }
-  if (identical(solver, "mm") || (identical(solver, "auto") && identical(plan$solver, "mm"))) {
+  if (identical(engine, "mm")) {
     raw <- .mm_gpa(data, spec, gauge, metric_use, alphas, control, anchor, loss)
-    plan_use <- if (identical(plan$solver, "mm")) plan else {
-      structure(list(solver = "mm", reasons = "solver='mm'",
-                     plan = "majorization with filled unobserved coordinates",
-                     allowed_claim = "first_order_stationary"),
-                class = "proc_solver_plan")
-    }
     fit <- .gpa_from_gower(raw, data, spec, gauge, metric_use, loss, compiled, plan_use,
                            ov, alphas, anchor, control)
     fit$cell_masks <- raw$cell_masks
+    fit$cell_weights <- raw$cell_weights
     return(fit)
   }
-  if (identical(solver, "lbw_eigen") || (identical(solver, "auto") && identical(plan$solver, "lbw_eigen"))) {
+  if (identical(engine, "lbw_eigen")) {
     raw <- .lbw_gpa(data, spec, gauge, metric_use, alphas, control, anchor)
-    plan_use <- if (identical(plan$solver, "lbw_eigen")) plan else {
-      structure(
-        list(
-          solver = "lbw_eigen",
-          reasons = "solver='lbw_eigen'",
-          plan = "variable projection plus constrained eigenproblem",
-          allowed_claim = "exact_closed_form for the stated LBW formulation"
-        ),
-        class = "proc_solver_plan"
-      )
-    }
     return(.gpa_from_lbw(raw, data, spec, gauge, metric_use, loss, compiled, plan_use,
                          ov, alphas, anchor, control))
   }
-  if (identical(solver, "gpm") || (identical(solver, "auto") && identical(plan$solver, "gpm"))) {
-    if (!identical(plan$solver, "gpm")) {
-      .gproc_stop("invalid_problem", "gpm does not apply to this compiled problem.")
-    }
+  if (identical(engine, "gpm")) {
     raw <- .gpm_gpa(data, spec, gauge, metric_use, alphas, control, anchor)
-    fit <- .gpa_from_gpm(raw, data, spec, gauge, metric_use, loss, compiled, plan,
+    fit <- .gpa_from_gpm(raw, data, spec, gauge, metric_use, loss, compiled, plan_use,
                          ov, alphas, anchor, control)
     if (identical(gauge$orientation, "principal")) {
       fit <- canonicalize(fit)
     }
     return(fit)
   }
-  if (identical(solver, "gower_bcd") || (identical(solver, "auto") && identical(plan$solver, "gower_bcd"))) {
+  if (identical(engine, "gower_bcd")) {
     raw <- .gower_gpa(data, spec, gauge, metric_use, alphas, control, anchor)
-    gower_plan <- if (identical(plan$solver, "gower_bcd")) plan else explain_solver(compiled)
-    if (!identical(gower_plan$solver, "gower_bcd") && identical(solver, "gower_bcd")) {
-      # Orthogonal problems prefer GPM; Gower BCD remains a legitimate forced engine.
-      gower_plan <- structure(
-        list(
-          solver = "gower_bcd",
-          reasons = c("solver='gower_bcd' requested", sprintf("transformation is %s", spec$group)),
-          plan = "block-coordinate descent against the consensus",
-          allowed_claim = "blockwise_stationary"
-        ),
-        class = "proc_solver_plan"
-      )
-    }
-    fit <- .gpa_from_gower(raw, data, spec, gauge, metric_use, loss, compiled, gower_plan,
+    fit <- .gpa_from_gower(raw, data, spec, gauge, metric_use, loss, compiled, plan_use,
                            ov, alphas, anchor, control)
     if (identical(gauge$orientation, "principal")) {
       fit <- canonicalize(fit)
@@ -161,6 +127,85 @@ gpa <- function(data,
     return(TRUE)
   }
   FALSE
+}
+
+#' @noRd
+.gproc_require_class <- function(x, class, name) {
+  if (!inherits(x, class)) {
+    .gproc_stop(
+      "invalid_problem",
+      sprintf("%s must be a %s object; malformed typed objects are not replaced by defaults.", name, class)
+    )
+  }
+  invisible(x)
+}
+
+#' Forced engines must pass the same capability row as `explain_solver()`.
+#'
+#' @noRd
+.gproc_validate_forced_solver <- function(compiled, solver, plan) {
+  if (identical(solver, "auto")) {
+    return(plan)
+  }
+  if (!.gproc_engine_applicable(compiled, solver)) {
+    .gproc_stop(
+      "invalid_problem",
+      sprintf("%s does not apply to this compiled problem.", solver)
+    )
+  }
+  if (identical(solver, plan$solver)) {
+    return(plan)
+  }
+  structure(
+    list(
+      solver = solver,
+      reasons = c(sprintf("solver='%s' requested", solver), plan$reasons),
+      plan = plan$plan,
+      allowed_claim = .gproc_engine_claim(solver)
+    ),
+    class = "proc_solver_plan"
+  )
+}
+
+#' @noRd
+.gproc_engine_applicable <- function(compiled, solver) {
+  spec <- compiled$transform
+  l2 <- identical(compiled$loss$family, "squared_l2")
+  cell <- isTRUE(compiled$cell_masked) || isTRUE(compiled$cell_metric)
+  robust <- compiled$loss$family %in% c("huber", "tukey")
+  lbw <- spec$family %in% c("affine", "lbw", "tps")
+  same_d <- length(unique(compiled$dimensions)) == 1L
+  switch(
+    solver,
+    gpm = l2 && !cell && !robust && !lbw && !isTRUE(compiled$landmark_weighted) &&
+      identical(spec$family, "orthogonal") && isTRUE(compiled$complete_covering) &&
+      compiled$n_views >= 2L && same_d,
+    gower_bcd = l2 && !cell && !robust && !lbw &&
+      spec$family %in% c("orthogonal", "similarity") && compiled$n_views >= 2L && same_d,
+    pairwise_polar = l2 && !cell && !robust && !lbw && compiled$n_views == 2L &&
+      spec$family %in% c("orthogonal", "similarity") && same_d,
+    signed_permutation = l2 && !cell && compiled$n_views == 2L &&
+      identical(spec$family, "signed_permutation"),
+    irls = robust && !cell && !lbw && spec$family %in% c("orthogonal", "similarity"),
+    mm = cell && !lbw && spec$family %in% c("orthogonal", "similarity"),
+    lbw_eigen = lbw && l2 && !cell,
+    FALSE
+  )
+}
+
+#' @noRd
+.gproc_engine_claim <- function(solver) {
+  switch(
+    solver,
+    gpm = "first_order_stationary; certified global only if dual test succeeds",
+    gower_bcd = "blockwise_stationary",
+    pairwise_polar = "exact_closed_form",
+    signed_permutation = "exact_closed_form",
+    irls = "blockwise_stationary",
+    mm = "first_order_stationary",
+    lbw_eigen = "exact_closed_form only for this constrained reference-space formulation",
+    "not_applicable"
+  )
 }
 
 #' @keywords internal
@@ -205,6 +250,9 @@ gpa <- function(data,
   if (length(alpha) != length(nms)) {
     .gproc_stop("invalid_problem", "configuration weights must match the number of views.")
   }
+  if (any(!is.finite(alpha)) || any(alpha < 0)) {
+    .gproc_stop("invalid_problem", "configuration weights must be finite and nonnegative.")
+  }
   stats::setNames(alpha, nms)
 }
 
@@ -221,20 +269,46 @@ gpa <- function(data,
     src <- setdiff(nms, anchor)
     src <- src[[1L]]
   }
-  X <- data$views[[src]]
-  Y <- data$views[[tgt]]
-  w <- .gproc_landmark_weights(metric$landmark, data, src, tgt)
-  mask <- data$observed[[src]] & data$observed[[tgt]]
-  if (!is.null(w)) {
-    w <- w[mask]
-  } else {
-    w <- rep(1, sum(mask))
+  shared <- intersect(
+    data$row_map[[src]][data$observed[[src]]],
+    data$row_map[[tgt]][data$observed[[tgt]]]
+  )
+  if (!length(shared)) {
+    .gproc_stop("disconnected_overlap_graph", "The two views share no observed entities.")
   }
-  pair <- procrustes(X[mask, , drop = FALSE], Y[mask, , drop = FALSE],
-                     transform = spec, weights = w)
+  ii <- match(shared, data$row_map[[src]])
+  jj <- match(shared, data$row_map[[tgt]])
+  X <- as.matrix(data$views[[src]])[ii, , drop = FALSE]
+  Y <- as.matrix(data$views[[tgt]])[jj, , drop = FALSE]
+  w <- .gproc_pairwise_landmark_weights(metric$landmark, data, src, tgt, shared, ii)
+  pair <- procrustes(X, Y, transform = spec, weights = w)
   pair$source_name <- src
   pair$target_name <- tgt
+  pair$shared_ids <- shared
   pair
+}
+
+#' @noRd
+.gproc_pairwise_landmark_weights <- function(landmark, data, src, tgt, shared, src_idx) {
+  n <- length(data$global_ids)
+  if (is.null(landmark)) {
+    return(rep(1, length(shared)))
+  }
+  src_w <- if (is.list(landmark)) landmark[[src]] else landmark
+  if (is.null(src_w)) {
+    return(rep(1, length(shared)))
+  }
+  src_w <- as.numeric(src_w)
+  if (length(src_w) == 1L) {
+    return(rep(src_w, length(shared)))
+  }
+  if (length(src_w) == n) {
+    return(src_w[shared])
+  }
+  if (length(src_w) == length(data$row_map[[src]])) {
+    return(src_w[src_idx])
+  }
+  .gproc_stop("invalid_problem", "Pairwise landmark weights have the wrong length.")
 }
 
 #' @keywords internal
@@ -265,10 +339,12 @@ gpa <- function(data,
     )
   })
   names(aligned_lazy) <- nms
-  mats <- lapply(aligned_lazy, as.matrix)
-  A <- sum(alphas)
-  M <- Reduce(`+`, Map(function(a, Y) a * Y, as.list(alphas), mats)) / A
-  energy <- decompose_energy(mats, M, alphas)
+  n <- length(data$global_ids)
+  d <- ncol(data$views[[1L]])
+  global <- lapply(aligned_lazy, function(v) .gproc_scatter_aligned(v, n, d))
+  M <- .gower_consensus(global, alphas, n, d)
+  energy <- decompose_energy(global, M, alphas)
+  obj <- .gower_objective(global, M, alphas)
   structure(
     list(
       problem = compiled,
@@ -283,11 +359,11 @@ gpa <- function(data,
       consensus = M,
       transformations = transforms,
       gauge = list(spec = gauge, freedoms = .gproc_gauge_freedoms(spec, ncol(M), pair)),
-      objective = pair$objective,
+      objective = obj,
       decomposition = energy,
       history = data.frame(
         iteration = 0L,
-        objective = pair$objective,
+        objective = obj,
         relative_change = 0,
         accepted_acceleration = FALSE
       ),
@@ -307,8 +383,9 @@ gpa <- function(data,
       optimality_status = pair$optimality_status,
       certificate = list(status = "unavailable"),
       warnings = list(),
-      aligned_store = if (identical(control$keep_aligned, "lazy")) aligned_lazy else mats,
+      aligned_store = aligned_lazy,
       keep_aligned = control$keep_aligned,
+      raw_data = data,
       solver_plan = plan,
       call = match.call(),
       version = .gproc_pkg_version()
@@ -361,7 +438,9 @@ gpa <- function(data,
         spec = gauge,
         scale_mode = raw$scale_mode,
         scale_note = raw$scale_note,
-        freedoms = .gproc_gauge_freedoms(spec, ncol(raw$consensus), NULL)
+        freedoms = .gproc_gauge_freedoms(
+          spec, ncol(raw$consensus), NULL, raw$reference_covariance
+        )
       ),
       objective = raw$objective,
       decomposition = energy,
@@ -389,8 +468,9 @@ gpa <- function(data,
         reason = "Gower BCD is monotone / blockwise stationary, not a Ling dual certificate."
       ),
       warnings = warnings,
-      aligned_store = if (identical(control$keep_aligned, "lazy")) aligned_lazy else lapply(aligned_lazy, as.matrix),
+      aligned_store = aligned_lazy,
       keep_aligned = control$keep_aligned,
+      raw_data = data,
       solver_plan = plan,
       init = raw$init,
       call = NULL,
@@ -463,10 +543,15 @@ gpa <- function(data,
 }
 
 #' @keywords internal
-.gproc_gauge_freedoms <- function(spec, d, pair = NULL) {
+.gproc_gauge_freedoms <- function(spec, d, pair = NULL, lambda = NULL) {
+  common_rot <- identical(spec$family, "orthogonal") ||
+    identical(spec$family, "similarity") ||
+    identical(spec$scaling, "none")
+  if (spec$family %in% c("affine", "lbw", "tps") && !is.null(lambda)) {
+    common_rot <- length(unique(round(as.numeric(lambda), 10))) <= 1L
+  }
   list(
-    common_rotation = identical(spec$family, "orthogonal") || identical(spec$scaling, "none") ||
-      identical(spec$family, "similarity"),
+    common_rotation = common_rot,
     common_translation = isTRUE(spec$translation),
     common_scale = identical(spec$scaling, "isotropic"),
     unidentified_subspace_dimension = if (is.null(pair)) NA_integer_ else pair$unidentified_subspace_dimension
@@ -480,17 +565,40 @@ gpa <- function(data,
 #' @param gauge Gauge spec.
 #' @param metric Metric.
 #' @param loss Loss.
+#' @param anchor Optional fixed view name.
+#' @param allow_disconnected If `TRUE`, a disconnected overlap graph is not fatal.
+#' @param solver Requested engine or `"auto"`.
 #' @export
 compile_proc_problem <- function(data,
                                  transform = proc_similarity(),
                                  gauge = proc_gauge(scale = "none"),
                                  metric = proc_metric(),
-                                 loss = proc_squared_l2()) {
+                                 loss = proc_squared_l2(),
+                                 anchor = NULL,
+                                 allow_disconnected = FALSE,
+                                 solver = "auto") {
   spec <- as_proc_transform(transform)
   data <- .gproc_as_data(data)
+  .gproc_require_class(gauge, "proc_gauge", "gauge")
+  .gproc_require_class(metric, "proc_metric", "metric")
+  .gproc_require_class(loss, "proc_loss", "loss")
   n_ent <- length(data$global_ids)
   n_rows <- vapply(data$views, nrow, integer(1))
   complete <- all(vapply(data$observed, all, logical(1)))
+  ov <- overlap_graph(data)
+  if (ov$n_components > 1L && !isTRUE(allow_disconnected)) {
+    .gproc_stop(
+      "disconnected_overlap_graph",
+      sprintf("Overlap graph has %d connected components.", ov$n_components)
+    )
+  }
+  if (!is.null(anchor) && !anchor %in% names(data$views)) {
+    .gproc_stop("invalid_problem", "Unknown anchor view.")
+  }
+  alphas <- .gproc_config_weights(metric$configuration, names(data$views))
+  if (sum(alphas) <= 0) {
+    .gproc_stop("zero_total_configuration_weight", "All configuration weights are zero.")
+  }
   structure(
     list(
       n_views = length(data$views),
@@ -500,7 +608,7 @@ compile_proc_problem <- function(data,
       transform = spec,
       gauge = gauge,
       metric = metric,
-      loss = if (inherits(loss, "proc_loss")) loss else proc_squared_l2(),
+      loss = loss,
       complete = complete,
       complete_covering = complete && all(n_rows == n_ent),
       row_masked = any(vapply(data$observed, function(m) !all(m), logical(1))),
@@ -509,7 +617,12 @@ compile_proc_problem <- function(data,
       }, logical(1))),
       cell_metric = !is.null(metric$cell) ||
         .gproc_coordinate_anisotropic(.gproc_fitting_covariance(metric)),
-      landmark_weighted = .gproc_landmark_weighted(metric, n_ent)
+      landmark_weighted = .gproc_landmark_weighted(metric, n_ent),
+      anchor = anchor,
+      allow_disconnected = isTRUE(allow_disconnected),
+      requested_solver = solver,
+      overlap = ov,
+      configuration_weights = alphas
     ),
     class = "proc_compiled_problem"
   )

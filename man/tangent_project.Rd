@@ -11,7 +11,7 @@ tangent_project(newdata, fit, as_residual = FALSE)
 
 \item{fit}{A \code{gpa_fit} that supplies the consensus and gauge.}
 
-\item{as_residual}{If \code{TRUE}, \code{newdata} is already \(Y-M\). If \code{FALSE},
+\item{as_residual}{If \code{TRUE}, \code{newdata} is already \eqn{Y-M}. If \code{FALSE},
 it is aligned to the consensus first.}
 }
 \description{

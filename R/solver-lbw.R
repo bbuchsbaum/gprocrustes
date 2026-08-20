@@ -1,6 +1,6 @@
-#' Variable-projection LBW / affine / TPS GPA (Bai–Bartoli).
+#' Variable-projection LBW / affine / TPS GPA (Bai-Bartoli).
 #'
-#' Eliminates \(B_i\) and recovers \(M\) from the bottom eigenvectors of \(P\).
+#' Eliminates \eqn{B_i} and recovers \eqn{M} from the bottom eigenvectors of \eqn{P}.
 #' The only allowed closed-form claim is for this constrained reference-space
 #' formulation after the free-translation check.
 #'
@@ -12,7 +12,7 @@
   if (any(vapply(data$views, ncol, integer(1)) != d)) {
     .gproc_stop("dimension_mismatch", "LBW GPA requires a common target dimension.")
   }
-  views <- .lbw_prepare_views(data, spec, metric)
+  views <- .lbw_prepare_views(data, spec, metric, alphas)
   free <- vapply(views, `[[`, logical(1), "free_translation")
   if (!all(free)) {
     .gproc_stop(
@@ -20,19 +20,24 @@
       "Free-translation check failed: Phi a = 1 and L a = 0 must hold."
     )
   }
-  P <- .lbw_form_P(views, alphas, n)
+  P <- .lbw_form_P(views, n, anchor)
   ones <- rep(1, n)
   p1 <- as.numeric(P %*% ones)
-  free_num <- sqrt(sum(p1^2)) <= 1e-8 * max(1, sqrt(sum(P^2)))
-  ev <- .gproc_eigen_smallest(P, k = min(n, d + 1L))
-  if (ncol(ev$vectors) < d + 1L) {
+  scaleP <- max(1, sqrt(sum(P^2)))
+  free_num <- sqrt(sum(p1^2)) <= 1e-8 * scaleP
+  nu <- 10 * max(1, max(abs(P)))
+  Pnu <- P + (nu / n) * tcrossprod(ones)
+  ev <- .gproc_eigen_smallest(Pnu, k = min(n, d + 1L))
+  if (ncol(ev$vectors) < d) {
     .gproc_stop("invalid_problem", "LBW eigenproblem did not yield d shape directions.")
   }
-  keep <- seq_len(d) + 1L
-  U <- ev$vectors[, keep, drop = FALSE]
-  eta <- ev$values[keep]
+  U <- ev$vectors[, seq_len(d), drop = FALSE]
+  eta <- ev$values[seq_len(d)]
+  gap <- if (length(ev$values) >= d + 1L) ev$values[[d + 1L]] - ev$values[[d]] else NA_real_
   Lambda <- .lbw_lambda(spec$reference_covariance, d)
-  M <- U %*% diag(sqrt(Lambda), d, d)
+  o <- order(Lambda, decreasing = TRUE)
+  M <- matrix(0, n, d)
+  M[, o] <- U * rep(sqrt(Lambda[o]), each = n)
   storage.mode(M) <- "double"
   transforms <- vector("list", length(nms))
   names(transforms) <- nms
@@ -45,11 +50,13 @@
       transforms[[nm]] <- proc_identity(spec, d)
       G <- matrix(NA_real_, n, d)
       G[v$map, ] <- apply_proc_transform(transforms[[nm]], v$X)
+      unobs <- v$map[!v$mask]
+      if (length(unobs)) G[unobs, ] <- NA_real_
       Y[[nm]] <- G
       next
     }
     Mloc <- M[v$map, , drop = FALSE]
-    B <- .gproc_psd_solve(v$A, crossprod(v$Phi, v$w * Mloc))
+    B <- .gproc_psd_solve(v$A, crossprod(v$Phi, v$w_eff * Mloc))
     pen <- pen + v$mu * sum(B * (v$L %*% B))
     tr <- .lbw_fitted(spec, B, v, d)
     transforms[[nm]] <- tr
@@ -63,9 +70,22 @@
   for (nm in nms) {
     dlt <- Y[[nm]] - M
     dlt[!is.finite(dlt)] <- 0
-    obj_data <- obj_data + alphas[[nm]] * sum(dlt^2)
+    w <- views[[nm]]$w
+    wg <- rep(0, n)
+    wg[views[[nm]]$map] <- w
+    obj_data <- obj_data + alphas[[nm]] * sum(wg * rowSums(dlt * dlt))
   }
-  gap <- ev$values[[d + 1L]] - ev$values[[d]]
+  ones_M <- sqrt(sum(colSums(M)^2))
+  lam_err <- sqrt(sum((crossprod(M) - diag(Lambda, d, d))^2))
+  eig_resid <- sqrt(sum((Pnu %*% U - U %*% diag(eta, d, d))^2))
+  psd_pen <- all(vapply(views, function(v) {
+    evL <- .gproc_eigen_sym((v$L + t(v$L)) / 2)$values
+    all(evL >= -1e-8 * max(1, max(abs(evL))))
+  }, logical(1)))
+  exact <- isTRUE(free_num) && ones_M <= 1e-6 * max(1, sqrt(sum(M^2))) &&
+    lam_err <= 1e-6 * max(1, max(Lambda)) &&
+    eig_resid <= 1e-5 * max(1, scaleP) &&
+    isTRUE(psd_pen)
   list(
     transforms = transforms,
     work_transforms = transforms,
@@ -82,12 +102,18 @@
       elapsed_time = 0
     ),
     numerical_status = "converged",
-    optimality_status = if (isTRUE(free_num)) "exact_closed_form" else "first_order_stationary",
+    optimality_status = if (exact) "exact_closed_form" else "first_order_stationary",
     stationarity = sqrt(sum(p1^2)),
     free_translation = free_num,
     reference_covariance = Lambda,
     eigen_values = eta,
     eigen_gap = gap,
+    formulation_checks = list(
+      ones_M = ones_M,
+      lambda_residual = lam_err,
+      eigen_residual = eig_resid,
+      penalty_psd = psd_pen
+    ),
     folding = .lbw_folding(transforms, views),
     init = "lbw_eigen"
   )
@@ -108,7 +134,7 @@
 }
 
 #' @noRd
-.lbw_prepare_views <- function(data, spec, metric) {
+.lbw_prepare_views <- function(data, spec, metric, alphas = NULL) {
   nms <- names(data$views)
   d <- ncol(data$views[[1L]])
   n <- length(data$global_ids)
@@ -135,16 +161,20 @@
     }
     built <- .lbw_basis(spec, X, mask)
     mu <- spec$smoothness %||% 0
-    A <- crossprod(built$Phi, w * built$Phi) + mu * built$L
+    a <- if (is.null(alphas)) 1 else alphas[[nm]]
+    w_eff <- a * w
+    A <- crossprod(built$Phi, w_eff * built$Phi) + mu * built$L
     out[[nm]] <- list(
       X = X,
       Phi = built$Phi,
       L = built$L,
       A = A,
       w = w,
+      w_eff = w_eff,
       mask = mask,
       map = map,
       mu = mu,
+      alpha = a,
       controls = built$controls,
       free_translation = built$free_translation,
       name = nm
@@ -245,23 +275,38 @@
   L <- matrix(0, 1L + d + c, 1L + d + c)
   if (c) {
     idx <- (2L + d):(1L + d + c)
-    L[idx, idx] <- K
+    Paff <- cbind(1, controls)
+    qrP <- qr(Paff)
+    rnk <- qrP$rank
+    Q <- qr.Q(qrP, complete = TRUE)
+    if (ncol(Q) > rnk) {
+      Qc <- Q[, (rnk + 1L):ncol(Q), drop = FALSE]
+      Kpsd <- Qc %*% crossprod(Qc, K %*% Qc) %*% t(Qc)
+    } else {
+      Kpsd <- matrix(0, c, c)
+    }
+    Kpsd <- (Kpsd + t(Kpsd)) / 2
+    L[idx, idx] <- Kpsd
   }
   L
 }
 
 #' @noRd
-.lbw_form_P <- function(views, alphas, n) {
+.lbw_form_P <- function(views, n, anchor = NULL) {
   P <- matrix(0, n, n)
   for (nm in names(views)) {
     v <- views[[nm]]
-    a <- alphas[[nm]]
-    Hi <- v$Phi %*% .gproc_psd_solve(v$A, t(v$Phi * v$w))
     obs <- v$map
-    contrib <- diag(v$w, length(v$w)) - Hi
-    P[obs, obs] <- P[obs, obs] + a * contrib
+    we <- v$w_eff
+    if (!is.null(anchor) && identical(nm, anchor)) {
+      contrib <- diag(we, length(we))
+    } else {
+      Hi <- (v$Phi * we) %*% .gproc_psd_solve(v$A, t(v$Phi * we))
+      contrib <- diag(we, length(we)) - Hi
+    }
+    P[obs, obs] <- P[obs, obs] + contrib
   }
-  P
+  (P + t(P)) / 2
 }
 
 #' @noRd

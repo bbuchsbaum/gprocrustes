@@ -9,25 +9,29 @@ procrustes(
   Y,
   transform = proc_orthogonal("O"),
   weights = NULL,
-  rank_tol = 1e-10
+  rank_tol = 1e-10,
+  center = NULL
 )
 }
 \arguments{
-\item{X}{Source configuration, \(n \times d\).}
+\item{X}{Source configuration, \eqn{n \times d}.}
 
-\item{Y}{Target configuration, \(n \times d\).}
+\item{Y}{Target configuration, \eqn{n \times d}.}
 
 \item{transform}{Transform specification or shortcut.}
 
-\item{weights}{Row weights \(w\).}
+\item{weights}{Row weights \eqn{w}.}
 
-\item{rank_tol}{Relative singular-value threshold \(\tau\).}
+\item{rank_tol}{Relative singular-value threshold \eqn{\tau}.}
+
+\item{center}{If \code{NULL}, translation is eliminated for \(O(d)\) / isotropic
+similarity and stored as \(t^\star\). \code{FALSE} uses raw moments.}
 }
 \value{
 A \code{proc_pair_fit}.
 }
 \description{
-Exact closed-form fit of \code{X} to \code{Y} under \(O(d)\), \(SO(d)\), or
+Exact closed-form fit of \code{X} to \code{Y} under \eqn{O(d)}, \eqn{SO(d)}, or
 similarity. Translation is eliminated analytically; centering uses
-sufficient statistics and never forms \(X_c\) explicitly.
+sufficient statistics and never forms \eqn{X_c} explicitly.
 }

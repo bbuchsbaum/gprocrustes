@@ -2,16 +2,18 @@
 % Please edit documentation in R/moments.R
 \name{centered_trace}
 \alias{centered_trace}
-\title{Weighted second-moment scalar \(\operatorname{tr}(X_c^\top W X_c)\).}
+\title{Weighted second-moment scalar \eqn{\operatorname{tr}(X_c^\top W X_c)}.}
 \usage{
 centered_trace(X, w = NULL)
 }
 \arguments{
+\item{X}{Matrix-like object.}
+
 \item{w}{Nonnegative row weights. Recycled to 1 if omitted.}
 }
 \value{
 A single nonnegative number.
 }
 \description{
-Weighted second-moment scalar \(\operatorname{tr}(X_c^\top W X_c)\).
+Weighted second-moment scalar \eqn{\operatorname{tr}(X_c^\top W X_c)}.
 }

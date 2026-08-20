@@ -74,7 +74,7 @@ Milestone 0 ships:
 
 - `gower-identity-pairwise-clusters` — identity (2) on a small complete example;
 - `gower-1975-algorithm-laws` — monotone residual decrease, common-centroid law, energy constraint, and “monotone \(\neq\) global” documentation;
-- `gower-1975-published-history` — placeholder for the published successive \(S_r\) sequence, to be filled by transcription from Table 2 of the 1975 paper (coordinates in Table 1). Until that transcription is complete the fixture records the citation and the identities that any correct implementation must satisfy.
+- `gower-1975-published-history` — Table 2 carcass scores (9 entities, 7 dimensions, 3 judges) and Table 5 successive \(S_r\). Table 1 in the paper is the ANOVA layout, not the coordinates. The published path is an oracle for Gower's 1975 rotation-then-scale schedule; `gpa()` need not reproduce that history.
 
 Do not invent published digits.
 

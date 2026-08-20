@@ -4,16 +4,16 @@
 \alias{plot_data}
 \title{Tidy data for a GPA diagnostic plot.}
 \usage{
-plot_data(object, ...)
+plot_data(object, type = "overlay", ...)
 }
 \arguments{
 \item{object}{A \code{gpa_fit}.}
 
-\item{...}{Unused.}
-
 \item{type}{One of \code{"overlay"}, \code{"residuals"}, \code{"convergence"},
 \code{"decomposition"}, \code{"influence"}, \code{"support"}, \code{"weights"},
 \code{"uncertainty"}.}
+
+\item{...}{Unused.}
 }
 \value{
 A data frame. For large overlays (\code{n > 5000}), a random sample

@@ -10,9 +10,9 @@ proc_tps(control_points = NULL, smoothness = 1, reference_covariance = 1)
 \item{control_points}{Optional shared control-point matrix. \code{NULL} uses
 each view's observed landmarks.}
 
-\item{smoothness}{Bending-energy weight \(\mu\).}
+\item{smoothness}{Bending-energy weight \eqn{\mu}.}
 
-\item{reference_covariance}{\(\Lambda\) in \(M^\top M=\Lambda\).}
+\item{reference_covariance}{\eqn{\Lambda} in \eqn{M^\top M=\Lambda}.}
 }
 \description{
 Thin-plate spline as an LBW constructor.

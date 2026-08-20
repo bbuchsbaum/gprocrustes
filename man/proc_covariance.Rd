@@ -12,18 +12,18 @@ proc_covariance(
 )
 }
 \arguments{
-\item{entity}{Landmark / entity factor \(\Sigma_N\) or its precision.}
+\item{entity}{Landmark / entity factor \eqn{\Sigma_N} or its precision.}
 
-\item{coordinate}{Coordinate factor \(\Sigma_d\) or its precision.}
+\item{coordinate}{Coordinate factor \eqn{\Sigma_d} or its precision.}
 
-\item{kind}{\code{"superimposition"} (\(\Sigma_S\)) or \code{"model"} (\(\Sigma_M\)).}
+\item{kind}{\code{"superimposition"} (\eqn{\Sigma_S}) or \code{"model"} (\eqn{\Sigma_M}).}
 
 \item{as_precision}{If \code{TRUE}, \code{entity} / \code{coordinate} are precisions.}
 }
 \description{
-\(\Sigma_S\) is the metric used to fit. \(\Sigma_M\) is reserved for
+\eqn{\Sigma_S} is the metric used to fit. \eqn{\Sigma_M} is reserved for
 inference and is not used by the solvers. A Kronecker structure
-\(\Sigma_N\otimes\Sigma_d\) is the small set the package implements.
-If \(\Sigma_d\propto I\), entity whitening or landmark weights recover
+\eqn{\Sigma_N\otimes\Sigma_d} is the small set the package implements.
+If \eqn{\Sigma_d\propto I}, entity whitening or landmark weights recover
 the exact SVD path. A genuine coordinate metric does not.
 }

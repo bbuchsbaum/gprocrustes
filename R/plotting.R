@@ -8,7 +8,7 @@
 #' @return A data frame. For large overlays (`n > 5000`), a random sample
 #'   of entities is returned and `sampled` / `n_total` attributes are set.
 #' @export
-plot_data <- function(object, ...) {
+plot_data <- function(object, type = "overlay", ...) {
   UseMethod("plot_data")
 }
 
@@ -34,9 +34,9 @@ plot_data.gpa_fit <- function(object,
   )
 }
 
-#' ggplot2 diagnostics for a `gpa_fit`.
+#' ggplot2 diagnostics for a `gpa_fit` or `proc_inference`.
 #'
-#' @param object A `gpa_fit`.
+#' @param object A `gpa_fit` or `proc_inference`.
 #' @param type Plot type; see `plot_data()`.
 #' @param ... Unused.
 #' @return A ggplot object.
@@ -395,6 +395,7 @@ plot_data.proc_inference <- function(object, type = "uncertainty", ...) {
   .gproc_plot_data_uncertainty(object, inference = object)
 }
 
+#' @rdname autoplot.gpa_fit
 #' @export
 autoplot.proc_inference <- function(object, type = "uncertainty", ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {

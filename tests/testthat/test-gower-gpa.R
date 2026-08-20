@@ -355,6 +355,35 @@ test_that("law-gower-energy fixture matches the algebraic identity", {
   expect_equal(dec$total_energy, dec$consensus_energy + dec$residual_energy, tolerance = 1e-12)
 })
 
+test_that("gower-1975-published-history transcribes Tables 2 and 5", {
+  skip_if_not_installed("jsonlite")
+  fx <- load_fixture("gower-1975-published-history")
+  expect_equal(fx$citation, "Gower, J. C. (1975). Psychometrika 40:33-51, Tables 2 and 5.")
+  nms <- fx$problem$views$name
+  expect_equal(nms, c("judge_1", "judge_2", "judge_3"))
+  mats <- lapply(seq_along(nms), function(i) {
+    m <- fx$problem$views$matrix[[i]]
+    if (is.list(m)) do.call(rbind, m) else as.matrix(m)
+  })
+  names(mats) <- nms
+  expect_equal(dim(mats$judge_1), c(9L, 7L))
+  expect_equal(mats$judge_1[1, ], c(47, 44, 49, 38, 35, 40, 40))
+  expect_equal(mats$judge_2[8, 1], 5)
+  expect_equal(mats$judge_3[8, ], c(5, 95, 95, 3, 20, 2, 24))
+  sr <- fx$expected$published_sr
+  expect_equal(sr$initial, 0.661438)
+  expect_equal(utils::tail(sr$with_scaling$after_scaling, 1), 0.598842)
+  expect_equal(utils::tail(sr$without_scaling$after_rotation, 1), 0.657137)
+  fit <- gpa(
+    mats,
+    transform = proc_similarity(group = "SO", translation = TRUE, scaling = "isotropic"),
+    gauge = proc_gauge(scale = "gower")
+  )
+  expect_true(all(diff(fit$history$objective) <= 1e-8))
+  expect_equal(certify(fit)$status, "unavailable")
+  expect_gt(sqrt(sum(consensus(fit)^2)), 0)
+})
+
 test_that("gower-1975-algorithm-laws remain documented on a live fit", {
   skip_if_not_installed("jsonlite")
   fx <- load_fixture("gower-1975-algorithm-laws")

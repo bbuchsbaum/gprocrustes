@@ -2,19 +2,19 @@
 % Please edit documentation in R/transforms.R
 \name{proc_lbw}
 \alias{proc_lbw}
-\title{Linear-basis warp: \(T(X)=\Phi B\) with quadratic penalty \(\operatorname{tr}(B^\top LB)\).}
+\title{Linear-basis warp: \eqn{T(X)=\Phi B} with quadratic penalty \eqn{\operatorname{tr}(B^\top LB)}.}
 \usage{
 proc_lbw(basis, penalty = NULL, smoothness = 0, reference_covariance = 1)
 }
 \arguments{
-\item{basis}{Function \verb{function(X)} returning \(\Phi\), or \code{"affine"}.}
+\item{basis}{Function \verb{function(X)} returning \eqn{\Phi}, or \code{"affine"}.}
 
-\item{penalty}{Symmetric penalty \(L\), a function of \(\Phi\), or \code{NULL}.}
+\item{penalty}{Symmetric penalty \eqn{L}, a function of \eqn{\Phi}, or \code{NULL}.}
 
-\item{smoothness}{Multiplier \(\mu\ge 0\).}
+\item{smoothness}{Multiplier \eqn{\mu\ge 0}.}
 
-\item{reference_covariance}{\(\Lambda\) in \(M^\top M=\Lambda\).}
+\item{reference_covariance}{\eqn{\Lambda} in \eqn{M^\top M=\Lambda}.}
 }
 \description{
-Linear-basis warp: \(T(X)=\Phi B\) with quadratic penalty \(\operatorname{tr}(B^\top LB)\).
+Linear-basis warp: \eqn{T(X)=\Phi B} with quadratic penalty \eqn{\operatorname{tr}(B^\top LB)}.
 }

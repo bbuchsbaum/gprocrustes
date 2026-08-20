@@ -2,15 +2,15 @@
 % Please edit documentation in R/transforms.R
 \name{proc_affine}
 \alias{proc_affine}
-\title{Affine maps under Bai–Bartoli reference-space constraints.}
+\title{Affine maps under Bai-Bartoli reference-space constraints.}
 \usage{
 proc_affine(reference_covariance = 1)
 }
 \arguments{
-\item{reference_covariance}{Scalar or length-\(d\) vector \(\lambda\).}
+\item{reference_covariance}{Scalar or length-\eqn{d} vector \eqn{\lambda}.}
 }
 \description{
-Right action \(T(X)=XA+\mathbf{1}t\), written as an LBW with a homogeneous
-column. \code{reference_covariance} is \(\Lambda\) in \(M^\top M=\Lambda\).
+Right action \eqn{T(X)=XA+\mathbf{1}t}, written as an LBW with a homogeneous
+column. \code{reference_covariance} is \eqn{\Lambda} in \eqn{M^\top M=\Lambda}.
 It is a modeling choice, never estimated invisibly.
 }

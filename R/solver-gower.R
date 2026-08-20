@@ -19,7 +19,7 @@
   views <- .gower_prepare_views(data, spec, scale_info$mode)
   views <- .gower_attach_landmark_weights(views, data, metric)
   spec_step <- spec
-  spec_step$translation <- FALSE
+  spec_step$translation <- isTRUE(spec$translation) && !identical(scale_info$mode, "preshape")
   if (scale_info$mode %in% c("preshape", "gower")) {
     spec_step$scaling <- "none"
     if (identical(scale_info$mode, "preshape")) {
@@ -111,7 +111,7 @@
     pre_s <- 1
     pre_t <- rep(0, d)
     X_work <- X
-    if (isTRUE(spec$translation) || identical(scale_mode, "preshape")) {
+    if (identical(scale_mode, "preshape")) {
       xbar <- weighted_centroid(X[mask, , drop = FALSE], w = NULL)
       X_work <- sweep(X, 2L, xbar, "-")
       pre_t <- -xbar
@@ -194,6 +194,9 @@
   state <- .gower_apply_scale(state, views, Y, M, alphas, scale_info$mode, n, d)
   Y <- .gower_aligned(views, state$transforms, n, d)
   M <- .gower_consensus(Y, alphas, n, d, views)
+  state$transforms <- .gower_refit_translations(views, M, state$transforms, spec_step)
+  Y <- .gower_aligned(views, state$transforms, n, d)
+  M <- .gower_consensus(Y, alphas, n, d, views)
   obj <- .gower_objective(Y, M, alphas, views)
   hist <- list()
   M_prev <- NULL
@@ -213,6 +216,9 @@
     state <- .gower_apply_scale(state, views, Y, M, alphas, scale_info$mode, n, d)
     Y <- .gower_aligned(views, state$transforms, n, d)
     M <- .gower_consensus(Y, alphas, n, d, views)
+    state$transforms <- .gower_refit_translations(views, M, state$transforms, spec_step)
+    Y <- .gower_aligned(views, state$transforms, n, d)
+    M <- .gower_consensus(Y, alphas, n, d, views)
     obj <- .gower_objective(Y, M, alphas, views)
     accepted_acc <- FALSE
 
@@ -223,6 +229,9 @@
       Y_try <- .gower_aligned(views, state_try$transforms, n, d)
       M_try <- .gower_consensus(Y_try, alphas, n, d, views)
       state_try <- .gower_apply_scale(state_try, views, Y_try, M_try, alphas, scale_info$mode, n, d)
+      Y_try <- .gower_aligned(views, state_try$transforms, n, d)
+      M_try <- .gower_consensus(Y_try, alphas, n, d, views)
+      state_try$transforms <- .gower_refit_translations(views, M_try, state_try$transforms, spec_step)
       Y_try <- .gower_aligned(views, state_try$transforms, n, d)
       M_try <- .gower_consensus(Y_try, alphas, n, d, views)
       obj_try <- .gower_objective(Y_try, M_try, alphas, views)
@@ -245,7 +254,7 @@
 
     rel <- abs(old_obj - obj) / max(1, abs(old_obj))
     cchg <- .gower_consensus_change(old_M, M)
-    stat <- .gower_stationarity(views, M, state$transforms)
+    stat <- .gower_stationarity(views, M, state$transforms, spec_step)
     orth <- .gower_orthogonality(state$transforms)
     hist[[it]] <- data.frame(
       iteration = it,
@@ -258,7 +267,7 @@
       accepted_acceleration = accepted_acc
     )
     M_prev <- old_M
-    if (rel <= tol && cchg <= sqrt(tol)) {
+    if (rel <= tol && cchg <= sqrt(tol) && stat <= sqrt(tol)) {
       status <- "converged"
       break
     }
@@ -273,7 +282,14 @@
     objective = obj,
     history = hist_df,
     numerical_status = status,
-    optimality_status = if (identical(status, "converged")) "blockwise_stationary" else "not_converged",
+    optimality_status = {
+      stat_final <- if (nrow(hist_df)) hist_df$stationarity[[nrow(hist_df)]] else Inf
+      if (identical(status, "converged") && is.finite(stat_final) && stat_final <= sqrt(tol)) {
+        "blockwise_stationary"
+      } else {
+        "not_converged"
+      }
+    },
     init = init,
     scale_mode = scale_info$mode,
     scale_note = scale_info$note,
@@ -387,6 +403,34 @@
   for (nm in names(views)) {
     if (!is.null(anchor) && identical(nm, anchor)) next
     transforms[[nm]] <- .gower_fit_one(views[[nm]], M, spec_step, transforms[[nm]])
+  }
+  transforms
+}
+
+#' @keywords internal
+#' After a collective scale step, restore the exact translation block update.
+#'
+#' @noRd
+.gower_refit_translations <- function(views, M, transforms, spec_step) {
+  if (!.gproc_eliminates_translation(spec_step)) {
+    return(transforms)
+  }
+  for (nm in names(views)) {
+    view <- views[[nm]]
+    idx <- view$map[view$mask]
+    if (!length(idx)) next
+    Y <- M[idx, , drop = FALSE]
+    keep <- rowSums(is.finite(Y)) == ncol(Y)
+    if (!any(keep)) next
+    X <- view$X[view$mask, , drop = FALSE][keep, , drop = FALSE]
+    Y <- Y[keep, , drop = FALSE]
+    w <- if (!is.null(view$w)) view$w[view$mask][keep] else NULL
+    if (!is.null(w) && sum(w) <= 0) next
+    tr <- transforms[[nm]]
+    xbar <- weighted_centroid(X, w)
+    ybar <- weighted_centroid(Y, w)
+    tr$t <- as.numeric(ybar - tr$s * (xbar %*% tr$R))
+    transforms[[nm]] <- tr
   }
   transforms
 }
@@ -541,7 +585,10 @@
   names(s) <- nms
   s[keep] <- s_keep
   for (nm in nms) {
+    old_s <- state$transforms[[nm]]$s
+    fac <- if (is.finite(old_s) && old_s > 0) unname(s[[nm]]) / old_s else unname(s[[nm]])
     state$transforms[[nm]]$s <- unname(s[[nm]])
+    state$transforms[[nm]]$t <- state$transforms[[nm]]$t * fac
   }
   state
 }
@@ -565,8 +612,10 @@
 }
 
 #' @keywords internal
-.gower_stationarity <- function(views, M, transforms) {
+.gower_stationarity <- function(views, M, transforms, spec_step = NULL) {
   rmax <- 0
+  translate <- .gproc_eliminates_translation(spec_step)
+  scale_on <- identical(spec_step$scaling, "isotropic")
   for (nm in names(views)) {
     view <- views[[nm]]
     idx <- view$map[view$mask]
@@ -576,11 +625,24 @@
     if (!any(keep)) next
     X <- view$X[view$mask, , drop = FALSE][keep, , drop = FALSE]
     Y <- Y[keep, , drop = FALSE]
-    C <- centered_crossprod(X, Y)
+    w <- if (!is.null(view$w)) view$w[view$mask][keep] else NULL
+    if (!is.null(w) && sum(w) <= 0) next
+    moms <- proc_moments(X, Y, w, center = translate)
+    C <- moms$C
     R <- transforms[[nm]]$R
+    s <- transforms[[nm]]$s
     S <- crossprod(R, C)
     skew <- 0.5 * (S - t(S))
     rmax <- max(rmax, sqrt(sum(skew^2)))
+    if (translate) {
+      Yhat <- apply_proc_transform(transforms[[nm]], X)
+      r_t <- sqrt(sum((weighted_centroid(Yhat, w) - weighted_centroid(Y, w))^2))
+      rmax <- max(rmax, r_t)
+    }
+    if (scale_on) {
+      gamma <- sum(R * C)
+      rmax <- max(rmax, abs(gamma - s * moms$a))
+    }
   }
   rmax
 }

@@ -4,12 +4,19 @@
 \alias{consensus}
 \title{Consensus matrix.}
 \usage{
-consensus(object, ...)
+consensus(object, gauge = "native", ...)
 }
 \arguments{
 \item{object}{A \code{gpa_fit}.}
 
+\item{gauge}{\code{"native"} for the optimizer's representative,
+\code{"canonical"} for a principal-axis presentation, or a reference
+\code{gpa_fit} / matrix to align to. Canonicalization is display, not estimation.}
+
 \item{...}{Unused.}
+}
+\value{
+The consensus matrix in the requested gauge.
 }
 \description{
 Consensus matrix.

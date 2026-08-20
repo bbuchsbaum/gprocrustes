@@ -15,7 +15,8 @@
       v = matrix(0, n, max(nv, 0L))
     ))
   }
-  rank <- max(1L, min(m, n, max(nu, nv, 1L)))
+  k_vecs <- max(nu, nv, 0L)
+  rank <- if (k_vecs <= 0L) min(m, n) else min(m, n, max(k_vecs, 1L))
   vecs <- if (nu <= 0L && nv <= 0L) "none" else "both"
   fit <- eigencore::svd_partial(A, rank = rank, vectors = vecs, certify = FALSE)
   d <- as.numeric(eigencore::values(fit))

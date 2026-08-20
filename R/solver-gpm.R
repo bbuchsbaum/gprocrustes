@@ -1,8 +1,8 @@
 #' Matrix-free generalized power method for orthogonal GOPP.
 #'
-#' Never forms \(C=B^\top B\). A step is \(Z=\sum_j\alpha_j X_j R_j\),
-#' \(B_i=\alpha_i X_i^\top Z\), then \(R_i\leftarrow\mathrm{polar}(B_i)\).
-#' Row masks use the \(D^\dagger\) operator of math section 18.
+#' Never forms \eqn{C=B^\top B}. A step is \eqn{Z=\sum_j\alpha_j X_j R_j},
+#' \eqn{B_i=\alpha_i X_i^\top Z}, then \eqn{R_i\leftarrow\mathrm{polar}(B_i)}.
+#' Row masks use the \eqn{D^\dagger} operator of math section 18.
 #'
 #' @noRd
 .gpm_gpa <- function(data, spec, gauge, metric, alphas, control, anchor = NULL) {
@@ -293,7 +293,7 @@
   }, numeric(1)))
 }
 
-#' Ling \(d_F(S,T)=\min_Q\|S-TQ\|_F\).
+#' Ling \eqn{d_F(S,T)=\min_Q\|S-TQ\|_F}.
 #'
 #' @noRd
 .gpm_gauge_change <- function(Rs_old, Rs_new) {
@@ -352,7 +352,7 @@
   .gpm_certificate(views, alphas, Rs, B, complete, backend, n, d)
 }
 
-#' Dual slack \(\Lambda-C\) at a GPM candidate (math section 17).
+#' Dual slack \eqn{\Lambda-C} at a GPM candidate (math section 17).
 #'
 #' @noRd
 .gpm_certificate <- function(views, alphas, Rs, B, complete, backend, n, d) {
@@ -364,14 +364,15 @@
   LS <- .gpm_stack(lapply(nms, function(nm) Lambda[[nm]] %*% Rs[[nm]]))
   r_dual <- sqrt(sum((CS - LS)^2)) / (1 + sqrt(sum(CS^2)))
   eigs <- .gpm_dual_eigs(views, alphas, Lambda, Rs, complete, backend, n, d)
-  ev <- sort(as.numeric(eigs))
+  ev <- sort(as.numeric(eigs$values))
   lam_min <- ev[[1L]]
   lam_next <- if (length(ev) >= d + 1L) ev[[d + 1L]] else NA_real_
   scale <- max(1, max(abs(ev)))
   tol_e <- 1e-7 * scale
   nullity <- as.integer(sum(abs(ev) <= tol_e))
-  psd <- lam_min >= -tol_e
-  unique_mod <- is.finite(lam_next) && lam_next > tol_e
+  bound_ok <- isTRUE(eigs$validated_lower_bound)
+  psd <- bound_ok && lam_min >= -tol_e
+  unique_mod <- bound_ok && is.finite(lam_next) && lam_next > tol_e
   certified <- isTRUE(psd) && r_dual <= 1e-6
   list(
     status = if (certified) "certified_global" else "not_certified",
@@ -381,8 +382,14 @@
     uniqueness_modulo_O = unique_mod,
     nullity = nullity,
     expected_nullity = as.integer(d),
+    dual_spectrum = eigs$method,
     reason = if (certified) {
       "CS = Lambda S and a numerical lower bound on lambda_min(Lambda - C) is nonnegative."
+    } else if (!bound_ok) {
+      paste(
+        "matrix-free Ritz values are an upper bound on lambda_min(Lambda - C),",
+        "not a validated lower bound; certificate unavailable"
+      )
     } else if (!psd) {
       sprintf("estimated smallest dual eigenvalue = %.6g; stationary candidate only", lam_min)
     } else {
@@ -399,7 +406,7 @@
   sv$u %*% (sv$d * t(sv$u))
 }
 
-#' Smallest eigenvalues of \(\Lambda-C\), forming the block Gram only when dense.
+#' Smallest eigenvalues of \eqn{\Lambda-C}, forming the block Gram only when dense.
 #'
 #' @noRd
 .gpm_dual_eigs <- function(views, alphas, Lambda, Rs, complete, backend, n, d) {
@@ -414,9 +421,10 @@
       Lbig[ii, ii] <- Lambda[[i]]
     }
     ev <- .gproc_eigen_sym(Lbig - C)$values
-    return(ev)
+    return(list(values = ev, validated_lower_bound = TRUE, method = "dense_full"))
   }
-  .gpm_dual_eigs_matrix_free(views, alphas, Lambda, complete, n, d)
+  ev <- .gpm_dual_eigs_matrix_free(views, alphas, Lambda, complete, n, d)
+  list(values = ev, validated_lower_bound = FALSE, method = "ritz")
 }
 
 #' @noRd
@@ -436,7 +444,7 @@
   }
   # Power iteration on a shifted operator for the smallest algebraic eigenvalues.
   nrm <- 0
-  v <- rnorm(kd)
+  v <- stats::rnorm(kd)
   v <- v / sqrt(sum(v^2))
   for (it in seq_len(8L)) {
     w <- as.numeric(apply_L(matrix(v, kd, 1L)))
@@ -444,7 +452,7 @@
     if (nrm > 0) v <- w / nrm
   }
   shift <- nrm + 1
-  U <- matrix(rnorm(kd * min(d + 3L, kd)), kd, min(d + 3L, kd))
+  U <- matrix(stats::rnorm(kd * min(d + 3L, kd)), kd, min(d + 3L, kd))
   U <- qr.Q(qr(U))
   for (it in seq_len(40L)) {
     W <- shift * U - apply_L(U)

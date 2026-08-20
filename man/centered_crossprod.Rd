@@ -12,10 +12,10 @@ centered_crossprod(X, Y, w = NULL)
 \item{w}{Nonnegative row weights. Recycled to 1 if omitted.}
 }
 \value{
-A \(p_X \times p_Y\) numeric matrix.
+A \eqn{p_X \times p_Y} numeric matrix.
 }
 \description{
 Implements the identity
-\(X_c^\top W Y_c = X^\top W Y - (X^\top w)(Y^\top w)^\top / (\mathbf{1}^\top w)\)
-so a sparse \(X\) is never explicitly centered.
+\eqn{X_c^\top W Y_c = X^\top W Y - (X^\top w)(Y^\top w)^\top / (\mathbf{1}^\top w)}
+so a sparse \eqn{X} is never explicitly centered.
 }

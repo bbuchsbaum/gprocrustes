@@ -14,4 +14,4 @@ Regenerate:
 python3 tools/generate_conformance.py
 ```
 
-Do not invent Gower 1975 table digits. `gower-1975-published-history` stays a transcription placeholder until Table 1–2 are copied from Psychometrika 40:33–51.
+`gower-1975-published-history` transcribes Table 2 (carcass scores) and Table 5 (successive \(S_r\)) from Psychometrika 40:33–51. Table 1 is the ANOVA layout. Do not invent further published digits.

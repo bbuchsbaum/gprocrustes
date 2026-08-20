@@ -2,16 +2,18 @@
 % Please edit documentation in R/moments.R
 \name{weighted_centroid}
 \alias{weighted_centroid}
-\title{Weighted centroids without forming \(X - 1\bar x\).}
+\title{Weighted centroids without forming \eqn{X - 1\bar x}.}
 \usage{
 weighted_centroid(X, w = NULL)
 }
 \arguments{
+\item{X}{Matrix-like object.}
+
 \item{w}{Nonnegative row weights. Recycled to 1 if omitted.}
 }
 \value{
 Numeric vector of column means.
 }
 \description{
-Weighted centroids without forming \(X - 1\bar x\).
+Weighted centroids without forming \eqn{X - 1\bar x}.
 }

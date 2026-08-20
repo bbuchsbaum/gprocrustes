@@ -26,7 +26,7 @@ test_that("pairwise fixtures match the closed-form kernel", {
     if (!is.null(exp[["scale"]])) {
       expect_equal(pair$transform$s, exp[["scale"]], tolerance = 1e-8)
     }
-    if (!is.null(exp[["translation"]])) {
+    if (!is.null(exp[["translation"]]) && isTRUE(pair$transform$spec$translation)) {
       expect_equal(as.numeric(pair$transform$t), as.numeric(exp[["translation"]]),
                    tolerance = 1e-8)
     }

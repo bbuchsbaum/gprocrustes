@@ -7,7 +7,7 @@
 proc_from_array(x, view_names = NULL)
 }
 \arguments{
-\item{x}{An array with dimensions \((n, d, K)\) or a list of matrices.}
+\item{x}{An array with dimensions \eqn{(n, d, K)} or a list of matrices.}
 
 \item{view_names}{Optional view names.}
 }

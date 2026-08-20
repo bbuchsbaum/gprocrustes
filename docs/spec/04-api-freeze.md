@@ -42,7 +42,10 @@ Spectral work (pairwise polar, GPM certificates, LBW bottom eigenvectors, canoni
 
 - `consensus()`, `transformations()`, `coef()`
 - `align_gauge()`, `canonicalize()`, `diagnose()`, `certify()`, `decompose()`
+- `quotient_distance()`, `principal_angles()`, `subspace_distance()`
+- `horizontal_component()`, `vertical_component()`, `tied_axis_blocks()`
 - `tangent_coordinates()`, `tangent_project()`
+- `consensus(fit, gauge = "native"|"canonical"|reference)`
 - `apply_proc_transform()`, `inverse_proc_transform()`, `compose_proc_transform()`
 - `datum_space_error()` — refused when no exact inverse exists
 
@@ -50,6 +53,7 @@ Spectral work (pairwise polar, GPM certificates, LBW bottom eigenvectors, canoni
 
 - `infer()`, `proc_shape_model()`
 - `cross_validate()`, `tune_smoothness()`
+- `tidy.gpa_fit()`, `glance.gpa_fit()`, `augment.gpa_fit()` — existing quantities only; broom registration on load
 
 ## Plots
 

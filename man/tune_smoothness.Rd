@@ -11,13 +11,13 @@ tune_smoothness(data, transform, smoothness = c(0.1, 1, 10), folds = 3L, ...)
 
 \item{transform}{An LBW / TPS / affine spec.}
 
-\item{smoothness}{Candidate \(\mu\) values.}
+\item{smoothness}{Candidate \eqn{\mu} values.}
 
 \item{folds}{Landmark folds.}
 
 \item{...}{Passed to \code{gpa()}.}
 }
 \description{
-Training residual always falls as \(\mu\downarrow\). Use this, not \(L_r\),
+Training residual always falls as \eqn{\mu\downarrow}. Use this, not \eqn{L_r},
 to choose bending energy.
 }

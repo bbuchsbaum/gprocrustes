@@ -14,14 +14,6 @@ the exact pairwise kernel.
 \details{
 The mathematics in \code{docs/spec/00-mathematics.md} is the primary specification.
 }
-\seealso{
-Useful links:
-\itemize{
-  \item \url{https://github.com/bbuchsbaum/gprocrustes}
-  \item Report bugs at \url{https://github.com/bbuchsbaum/gprocrustes/issues}
-}
-
-}
 \author{
 \strong{Maintainer}: Brad Buchsbaum \email{brad.buchsbaum@gmail.com}
 

@@ -4,15 +4,15 @@
 \alias{tangent_coordinates}
 \title{Tangent / horizontal coordinates of aligned residuals.}
 \usage{
-tangent_coordinates(object, ...)
+tangent_coordinates(object, model = NULL, ...)
 }
 \arguments{
 \item{object}{A \code{gpa_fit}.}
 
-\item{...}{Unused.}
+\item{model}{Optional \code{proc_shape_model} whose covariance supplies \eqn{Q}.
+Fitting-metric \eqn{Q} is used only if the model says so.}
 
-\item{model}{Optional \code{proc_shape_model} whose covariance supplies \(Q\).
-Fitting-metric \(Q\) is used only if the model says so.}
+\item{...}{Unused.}
 }
 \value{
 A list of entity-by-dimension tangent residual matrices.
