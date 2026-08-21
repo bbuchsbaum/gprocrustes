@@ -15,3 +15,5 @@ python3 tools/generate_conformance.py
 ```
 
 `gower-1975-published-history` transcribes Table 2 (carcass scores) and Table 5 (successive \(S_r\)) from Psychometrika 40:33–51. Table 1 is the ANOVA layout. Do not invent further published digits.
+
+Optional R / Python / Julia package cross-checks are specified in [docs/spec/02-conformance-suite.md](../../docs/spec/02-conformance-suite.md) (External package oracles). They consume these fixtures; they do not write them.
