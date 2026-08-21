@@ -1,12 +1,10 @@
 # gprocrustes
 
-[Charter](inst/CHARTER.md) · [Mathematics](docs/spec/00-mathematics.md) · [API freeze](docs/spec/04-api-freeze.md) · [Vignette](vignettes/gprocrustes.Rmd)
+**gprocrustes** is an R package that aligns two or more tables of corresponding points — landmarks, stimuli, vertices — into a shared shape. You get the aligned tables, the transform that produced each one, and a status that says whether the solution is exact or only a place the solver stopped.
 
-**gprocrustes** is an R package for pairwise and generalized Procrustes analysis that returns a shared consensus, the transform that took each configuration there, and a status saying what was actually solved.
+Use it when you already know which row in one table is the same entity as which row in another. It will not guess a matching.
 
-Use it when the same entities — landmarks, stimuli, tasks, vertices — appear in more than one recording and the correspondence is known. The package will not invent a matching.
-
-> **Status:** Source-only pre-release (`0.0.1.9000`). The 1.0 surface is frozen in the spec; it is not on CRAN yet.
+> **Status:** Pre-release, GitHub only (`0.0.1.9000`). Not on CRAN.
 
 ## Quick start
 
@@ -16,88 +14,58 @@ Use it when the same entities — landmarks, stimuli, tasks, vertices — appear
 
 library(gprocrustes)
 
+# Four points of a unit square. Rows are points; columns are x, y.
 X <- matrix(c(0, 0, 1, 0, 1, 1, 0, 1), 4, 2, byrow = TRUE)
-rot90 <- matrix(c(0, 1, -1, 0), 2, 2, byrow = TRUE)
-Y <- X %*% rot90
+Y <- X %*% matrix(c(0, 1, -1, 0), 2, 2, byrow = TRUE)   # same square, rotated 90°
 
 fit <- procrustes(X, Y, transform = proc_orthogonal("SO"))
-fit
-#> Pairwise Procrustes fit
-#>   Group: SO
-#>   Effective rank: 2 of 2
-#>   Transform uniqueness: yes
-#>   Objective uniqueness: yes
-#>   Unidentified subspace dimension: 0
-#>   Objective: 0
-#>   Numerical status: exact
-#>   Optimality: exact_closed_form
+fit$objective            # 0
+fit$optimality_status    # "exact_closed_form"
 ```
 
-`O(d)` and `SO(d)` are different groups. This pair is an exact rotation, so the kernel reports `exact_closed_form` and the stored transform reproduces \(Y\).
+`SO` means rotation only (no reflection). The stored transform applied to `X` recovers `Y`.
 
-Three recordings of the same four points, no noise:
+Several recordings of the same points go through `gpa()`. It estimates one consensus instead of treating one recording as the truth:
 
 ```r
-views <- list(
-  A = X,
-  B = Y,
-  C = X %*% matrix(c(0, -1, 1, 0), 2, 2, byrow = TRUE)
-)
-g <- gpa(views, transform = proc_orthogonal("O"))
-g$solver              # "gpm"
-g$optimality_status   # "certified_global"
-certify(g)$status     # "certified_global"
+g <- gpa(list(A = X, B = Y), transform = proc_orthogonal("O"))
+g$optimality_status      # "certified_global" on this noiseless pair
 ```
 
-Unanchored multi-view problems estimate a consensus. A certificate is emitted only when Ling’s dual test succeeds. Ordinary descent is never relabelled “probably global.”
+`certified_global` means a separate check confirmed a global orthogonal solution. Most real fits report only that they converged to a stationary point. The package will not upgrade that to “probably global.”
 
-Rows are entities; columns are dimensions. The action is \(T(X)=sXR+\mathbf{1}t\). If your matrices are features-by-observations, transpose before you call the engine.
+If your matrices are features × observations, transpose them first.
 
-## Partial correspondence
+## Missing landmarks
 
-Configurations need not share every entity. Name the rows; missing landmarks stay missing.
+Name the rows when the tables do not share every point. The consensus has one row per named entity.
 
 ```r
 dat <- proc_data(
   list(A = X[1:3, ], B = Y[c(1, 2, 4), ]),
   ids = list(A = c("nw", "ne", "se"), B = c("nw", "ne", "sw"))
 )
-partial <- gpa(dat, transform = proc_orthogonal("O"))
-nrow(consensus(partial))   # 4 — the union of named entities
+nrow(consensus(gpa(dat, transform = proc_orthogonal("O"))))   # 4
 ```
-
-A missing **row** is not a missing **cell**. Cell masks are a different problem and get a different solver and a weaker claim.
 
 ## What it covers
 
-- Pairwise \(O(d)\), \(SO(d)\), and similarity, including the exact residual formulas
-- Symmetric consensus GPA (Gower) and matrix-free generalized power method
-- An optimality certificate when the dual test has a validated lower bound; otherwise `not_certified` or `unavailable`
-- Native row masks, cell masks, and sparse moments (sparse inputs stay sparse through centering)
-- One deformable family: affine / thin-plate / linear-basis warps, with \(\Lambda\) stated explicitly
-- Inference (`infer()`, `cross_validate()`) as a layer after fitting, not a second superimposition metric
-- Diagnostics: overlay, residuals, support, influence, decomposition — not decorative plots
+- Align two configurations (rotation, optional reflection, scale, translation)
+- Align many configurations to one consensus
+- Partial overlap: some points present in only some recordings
+- A status on every fit: exact, certified, stationary, or unconverged
+- Overlay and residual plots for the fit, not a presentation layer
 
-`vegan::procrustes` compares two ordinations. `shapes` and `geomorph` register landmark arrays for morphometrics. This package is the matrix-like engine underneath: typed groups, missingness, and claims you can read off the fit.
+`vegan` compares two ordinations. `shapes` and `geomorph` register landmark arrays for morphometrics. This package is for matrix-shaped data when you need the correspondence, the missingness, and the claim to stay explicit.
 
-## Fit and boundaries
-
-Good fit when correspondence is known, configurations are entity-by-dimension matrices (dense or sparse), and you need to know whether the number you got is exact, certified, or only stationary.
-
-It does not do ICP, unknown matching, optimal transport, sliding semilandmarks, mesh repair, or image registration. Semi-orthogonal alignment of unequal column dimensions is post-1.0.
-
-Install from GitHub. Spectral work goes through [eigencore](https://bbuchsbaum.github.io/eigencore/).
+It does not search for unknown matches (ICP, transport) and it is not a full geometric-morphometrics environment.
 
 ## Documentation
 
-- [Aligning landmark configurations](vignettes/gprocrustes.Rmd) — the first guided workflow
-- [Public API](docs/spec/03-public-api.md) and [1.0 freeze](docs/spec/04-api-freeze.md) — names and what may be claimed
-- [Mathematics](docs/spec/00-mathematics.md) — primary specification (the R API falls out of it)
-- [Conventions](docs/spec/00-conventions.md) — orientation, gauge, missingness, weights
-- [Solver guarantee matrix](docs/spec/01-solver-guarantee-matrix.md) — the only allowed optimality claims
-- [Conformance suite](docs/spec/02-conformance-suite.md) — language-neutral fixtures and external oracles
-- [Source papers](docs/references/README.md) — Gower, Goodall, Ling, Bai–Bartoli
+- [Aligning landmark configurations](vignettes/gprocrustes.Rmd) — first workflow
+- [Mathematics and guarantees](docs/spec/00-mathematics.md) — the specification the API is built from
+- [1.0 API](docs/spec/04-api-freeze.md) — exported names and allowed claims
 
 ## License
 
-MIT. Author: [Brad Buchsbaum](mailto:brad.buchsbaum@gmail.com).
+MIT. [Brad Buchsbaum](mailto:brad.buchsbaum@gmail.com).
