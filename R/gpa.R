@@ -1,9 +1,8 @@
 #' Fit a Procrustes / GPA problem.
 #'
-#' Unanchored orthogonal problems use the matrix-free generalized power
-#' method. Similarity problems use consensus-first Gower BCD. Two views
-#' with an explicit `anchor` (or a signed-permutation group) use the exact
-#' pairwise kernel.
+#' Compatible two-view problems use the exact pairwise kernel. Multiway
+#' orthogonal problems use the matrix-free generalized power method, and
+#' multiway similarity problems use consensus-first Gower BCD.
 #'
 #' @param data A `proc_data` object, a list of matrices, or a single matrix
 #'   (used as the source when `...` is unused).
@@ -123,6 +122,10 @@ gpa <- function(data,
   if (k == 2L && identical(spec$family, "signed_permutation")) {
     return(TRUE)
   }
+  if (k == 2L && identical(solver, "auto") &&
+      plan$solver %in% c("pairwise_polar", "signed_permutation")) {
+    return(TRUE)
+  }
   if (k == 2L && !is.null(anchor) && plan$solver %in% c("gower_bcd", "pairwise_polar", "gpm")) {
     return(TRUE)
   }
@@ -217,7 +220,7 @@ gpa <- function(data,
         sprintf("transformation is %s", spec$group),
         "loss is squared L2",
         "two configurations",
-        "explicit anchor or signed-permutation kernel"
+        "exact relative transform represents the symmetric optimum modulo gauge"
       ),
       plan = c(
         "weighted sufficient-statistic moments",
@@ -539,6 +542,16 @@ gpa <- function(data,
   fit$certificate <- raw$certificate
   fit$backend <- raw$backend %||% "matrix_free"
   fit$optimality_status <- raw$optimality_status
+  fit$requested_init <- raw$requested_init
+  fit$starts <- raw$starts
+  fit$start_objectives <- raw$start_objectives
+  fit$degenerate_starts <- raw$degenerate_starts
+  if (!is.null(raw$restart_reason)) {
+    fit$warnings <- c(fit$warnings, list(list(
+      code = "zero_consensus_restart",
+      message = raw$restart_reason
+    )))
+  }
   fit
 }
 
@@ -725,7 +738,16 @@ explain_solver <- function(x) {
   if (signed_pair) {
     return(.gpa_pairwise_plan(spec))
   }
-  gpm_ok <- x$n_views >= 2L &&
+  pairwise_ok <- x$n_views == 2L &&
+    identical(x$loss$family, "squared_l2") &&
+    !isTRUE(x$cell_masked) &&
+    !isTRUE(x$cell_metric) &&
+    spec$family %in% c("orthogonal", "similarity") &&
+    length(unique(x$dimensions)) == 1L
+  if (pairwise_ok) {
+    return(.gpa_pairwise_plan(spec))
+  }
+  gpm_ok <- x$n_views >= 3L &&
     identical(x$loss$family, "squared_l2") &&
     !isTRUE(x$cell_metric) &&
     !isTRUE(x$landmark_weighted) &&

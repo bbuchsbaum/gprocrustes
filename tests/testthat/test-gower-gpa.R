@@ -187,11 +187,11 @@ test_that("K=2 with an explicit anchor stays on the pairwise kernel", {
   expect_equal(transformations(fit)[["A"]]$R, diag(2), tolerance = 1e-12)
 })
 
-test_that("K=2 without anchor is consensus-first Gower BCD", {
+test_that("K=2 without anchor uses the exact pairwise kernel", {
   views <- make_views()[1:2]
   fit <- gpa(views, transform = proc_orthogonal("SO"))
-  expect_equal(fit$solver, "gpm")
-  expect_true(fit$optimality_status %in% c("first_order_stationary", "certified_global"))
+  expect_equal(fit$solver, "pairwise_polar")
+  expect_equal(fit$optimality_status, "exact_closed_form")
 })
 
 test_that("inits sequential, medoid, and spectral all converge on complete data", {

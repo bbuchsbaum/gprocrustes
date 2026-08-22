@@ -10,7 +10,7 @@
 #' @param weights Row weights \eqn{w}.
 #' @param rank_tol Relative singular-value threshold \eqn{\tau}.
 #' @param center If `NULL`, translation is eliminated for \(O(d)\) / isotropic
-#'   similarity and stored as \(t^\star\). `FALSE` uses raw moments.
+#'   similarity and stored as \eqn{t^\star}. `FALSE` uses raw moments.
 #' @return A `proc_pair_fit`.
 #' @export
 procrustes <- function(X,
