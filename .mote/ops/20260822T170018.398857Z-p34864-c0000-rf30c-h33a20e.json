@@ -1,0 +1,1 @@
+{"actor":"codex-gprocrustes-fix","entity":"gpr-ez1","kind":"note","note_kind":"progress","op":"20260822T170018.398857Z-p34864-c0000-rf30c-h33a20e","text":"Implemented in e51702b31cfcaba10572a7d76725da46d1e002b9. Full testthat passes; R CMD check --as-cran --no-manual is 0 errors, 0 warnings, 1 informational new-submission note.","ts":"2026-08-22T17:00:18.398857Z","v":1}

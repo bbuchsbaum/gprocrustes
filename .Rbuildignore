@@ -1,6 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.beads$
+^\.mote$
 ^\.claude$
 ^\.cursor$
 ^docs$

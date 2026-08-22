@@ -1,0 +1,1 @@
+{"actor":"codex-gprocrustes-fix","entity":"gpr-ez1","kind":"note","note_kind":"decision","op":"20260822T170018.379773Z-p34863-c0000-rfa7b-h834df4","text":"Use exact pairwise polar for compatible two-view auto problems; use engine-specific initialization defaults; keep GPM restarts objective-aware and scale-free.","ts":"2026-08-22T17:00:18.379773Z","v":1}
