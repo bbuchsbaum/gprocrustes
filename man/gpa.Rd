@@ -42,8 +42,7 @@ force engines.}
 A \code{gpa_fit}.
 }
 \description{
-Unanchored orthogonal problems use the matrix-free generalized power
-method. Similarity problems use consensus-first Gower BCD. Two views
-with an explicit \code{anchor} (or a signed-permutation group) use the exact
-pairwise kernel.
+Compatible two-view problems use the exact pairwise kernel. Multiway
+orthogonal problems use the matrix-free generalized power method, and
+multiway similarity problems use consensus-first Gower BCD.
 }

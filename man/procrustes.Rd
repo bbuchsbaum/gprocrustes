@@ -25,7 +25,7 @@ procrustes(
 \item{rank_tol}{Relative singular-value threshold \eqn{\tau}.}
 
 \item{center}{If \code{NULL}, translation is eliminated for \(O(d)\) / isotropic
-similarity and stored as \(t^\star\). \code{FALSE} uses raw moments.}
+similarity and stored as \eqn{t^\star}. \code{FALSE} uses raw moments.}
 }
 \value{
 A \code{proc_pair_fit}.

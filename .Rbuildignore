@@ -10,4 +10,5 @@
 ^\.github$
 ^\.rcmdcheck_result\.rds$
 ^.*\.Rcheck$
+^\.git$
 ^\.oracle-gprocrustes-1\.0-review\.md$

@@ -18,8 +18,67 @@
   views <- .gpm_prepare_views(data)
   complete <- all(vapply(views, function(v) all(v$mask) && length(v$map) == n, logical(1)))
   backend <- .gpm_backend(control, length(nms) * d)
-  Rs <- .gpm_initialize(views, spec, alphas, n, d, nms, control$init %||% "spectral",
-                        complete, backend, anchor)
+  requested_init <- control$init %||% "spectral"
+  starts <- .gpm_start_names(control)
+  candidates <- list()
+  for (init in starts) {
+    candidates[[init]] <- .gpm_run(
+      views, spec, alphas, control, anchor, n, d, nms, complete, backend, init
+    )
+  }
+
+  best_name <- names(candidates)[[which.min(vapply(candidates, `[[`, numeric(1), "objective"))]]
+  best <- candidates[[best_name]]
+  restart_reason <- NULL
+  if (.gpm_zero_consensus(best, alphas)) {
+    restart_reason <- paste(
+      sprintf("%s initialization converged to a zero-consensus positive-objective point;", best_name),
+      "tried a deterministic alternative"
+    )
+    remaining <- setdiff(c("spectral", "medoid", "sequential"), names(candidates))
+    for (init in remaining) {
+      candidates[[init]] <- .gpm_run(
+        views, spec, alphas, control, anchor, n, d, nms, complete, backend, init
+      )
+      best_name <- names(candidates)[[which.min(vapply(candidates, `[[`, numeric(1), "objective"))]]
+      best <- candidates[[best_name]]
+      if (!.gpm_zero_consensus(best, alphas)) {
+        break
+      }
+    }
+  }
+
+  objectives <- vapply(candidates, `[[`, numeric(1), "objective")
+  best_name <- names(candidates)[[which.min(objectives)]]
+  best <- candidates[[best_name]]
+  best$requested_init <- requested_init
+  best$starts <- names(candidates)
+  best$start_objectives <- objectives
+  best$degenerate_starts <- names(candidates)[vapply(
+    candidates, .gpm_zero_consensus, logical(1), alphas = alphas
+  )]
+  best$restart_reason <- restart_reason
+  best
+}
+
+#' @noRd
+.gpm_start_names <- function(control) {
+  init <- control$init %||% "spectral"
+  init <- .gproc_match_arg(init, c("sequential", "medoid", "spectral"), "init")
+  nstart <- as.integer(control$nstart %||% 1L)
+  if (!is.finite(nstart) || nstart < 1L) nstart <- 1L
+  nstart <- min(nstart, 3L)
+  utils::head(unique(c(init, "medoid", "spectral", "sequential")), nstart)
+}
+
+#' One GPM run from one deterministic initializer.
+#'
+#' @noRd
+.gpm_run <- function(views, spec, alphas, control, anchor, n, d, nms,
+                     complete, backend, init) {
+  Rs <- .gpm_initialize(
+    views, spec, alphas, n, d, nms, init, complete, backend, anchor
+  )
   t0 <- proc.time()[["elapsed"]]
   maxit <- control$max_iterations %||% 500L
   tol <- control$tolerance %||% 1e-8
@@ -72,12 +131,32 @@
     history = hist_df,
     numerical_status = status,
     optimality_status = opt,
-    init = control$init %||% "spectral",
+    init = init,
     stationarity = if (nrow(hist_df)) hist_df$stationarity[[nrow(hist_df)]] else NA_real_,
     certificate = cert,
     backend = backend,
     complete = complete
   )
+}
+
+#' Detect a nontrivial fit whose consensus has collapsed relative to its data energy.
+#'
+#' The ratio is scale-free. All-zero inputs are legitimate and do not trigger a
+#' restart; a collapsed nonzero problem has essentially all energy in residuals.
+#'
+#' @noRd
+.gpm_zero_consensus <- function(candidate, alphas) {
+  total_energy <- sum(vapply(names(candidate$aligned), function(nm) {
+    alphas[[nm]] * sum(candidate$aligned[[nm]]^2)
+  }, numeric(1)))
+  if (!is.finite(total_energy) || total_energy <= .Machine$double.xmin) {
+    return(FALSE)
+  }
+  consensus_energy <- sum(alphas) * sum(candidate$consensus^2)
+  tol <- 256 * .Machine$double.eps
+  is.finite(consensus_energy) &&
+    consensus_energy <= tol * total_energy &&
+    candidate$objective > tol * total_energy
 }
 
 #' @noRd
