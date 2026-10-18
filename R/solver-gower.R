@@ -118,6 +118,9 @@
     }
     if (identical(scale_mode, "preshape")) {
       nrm <- sqrt(sum(X_work[mask, , drop = FALSE]^2))
+      if (!is.finite(nrm) || nrm <= 0) {
+        .gproc_stop("invalid_problem", "Preshape normalization needs positive centered configuration size.")
+      }
       if (nrm > 0) {
         X_work <- X_work / nrm
         pre_s <- 1 / nrm

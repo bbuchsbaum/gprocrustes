@@ -46,7 +46,8 @@ gpa <- function(data,
   plan_use <- .gproc_validate_forced_solver(compiled, solver, plan)
   alphas <- compiled$configuration_weights
   metric_use <- .gproc_apply_goodall_metric(metric, data)
-  use_pairwise <- .gpa_use_pairwise(data, spec, solver, plan_use, anchor)
+  use_pairwise <- !identical(gauge$scale, "preshape") &&
+    .gpa_use_pairwise(data, spec, solver, plan_use, anchor)
   if (use_pairwise) {
     pair_plan <- if (plan_use$solver %in% c("pairwise_polar", "signed_permutation")) {
       plan_use
@@ -174,21 +175,22 @@ gpa <- function(data,
   cell <- isTRUE(compiled$cell_masked) || isTRUE(compiled$cell_metric)
   robust <- compiled$loss$family %in% c("huber", "tukey")
   lbw <- spec$family %in% c("affine", "lbw", "tps")
+  preshape <- identical(compiled$gauge$scale, "preshape")
   same_d <- length(unique(compiled$dimensions)) == 1L
   switch(
     solver,
-    gpm = l2 && !cell && !robust && !lbw && !isTRUE(compiled$landmark_weighted) &&
+    gpm = l2 && !cell && !robust && !lbw && !preshape && !isTRUE(compiled$landmark_weighted) &&
       identical(spec$family, "orthogonal") && isTRUE(compiled$complete_covering) &&
       compiled$n_views >= 2L && same_d,
     gower_bcd = l2 && !cell && !robust && !lbw &&
       spec$family %in% c("orthogonal", "similarity") && compiled$n_views >= 2L && same_d,
-    pairwise_polar = l2 && !cell && !robust && !lbw && compiled$n_views == 2L &&
+    pairwise_polar = l2 && !cell && !robust && !lbw && !preshape && compiled$n_views == 2L &&
       spec$family %in% c("orthogonal", "similarity") && same_d,
     signed_permutation = l2 && !cell && compiled$n_views == 2L &&
       identical(spec$family, "signed_permutation"),
     irls = robust && !cell && !lbw && spec$family %in% c("orthogonal", "similarity"),
     mm = cell && !lbw && spec$family %in% c("orthogonal", "similarity"),
-    lbw_eigen = lbw && l2 && !cell,
+    lbw_eigen = lbw && l2 && !cell && is.null(compiled$anchor),
     FALSE
   )
 }
@@ -595,6 +597,12 @@ compile_proc_problem <- function(data,
   if (!is.null(anchor) && !anchor %in% names(data$views)) {
     .gproc_stop("invalid_problem", "Unknown anchor view.")
   }
+  if (!is.null(anchor) && spec$family %in% c("affine", "lbw", "tps")) {
+    .gproc_stop("invalid_problem", paste(
+      "Anchored affine/LBW/TPS fitting is not implemented:",
+      "a fixed anchor adds a linear term outside the homogeneous eigenproblem."
+    ))
+  }
   alphas <- .gproc_config_weights(metric$configuration, names(data$views))
   if (sum(alphas) <= 0) {
     .gproc_stop("zero_total_configuration_weight", "All configuration weights are zero.")
@@ -664,9 +672,9 @@ explain_solver <- function(x) {
             sprintf("landmark-vector %s is evaluated on observed cells", x$loss$family)
         ),
         plan = c(
-          "fill unobserved target coordinates from the current residual",
-          "solve a complete surrogate",
-          "accept only a decrease of the true observed-data objective"
+          "optimize the true observed landmark-vector loss on a product manifold",
+          "Cayley rotation charts and analytic gradients for every free block",
+          "accept only true-objective descent; require first-order residuals"
         ),
         allowed_claim = "first_order_stationary"
       ),
@@ -726,6 +734,7 @@ explain_solver <- function(x) {
     return(.gpa_pairwise_plan(spec))
   }
   gpm_ok <- x$n_views >= 2L &&
+    !identical(x$gauge$scale, "preshape") &&
     identical(x$loss$family, "squared_l2") &&
     !isTRUE(x$cell_metric) &&
     !isTRUE(x$landmark_weighted) &&

@@ -73,8 +73,8 @@ Convergence is assessed **modulo gauge**. Tied subspaces use projectors / princi
 ### Cell mask or anisotropic coordinate metric
 
 - **Applies when:** \(\Omega_i\) differs by coordinate, or \(\Sigma_d\not\propto I\).
-- **Method:** MM (fill unobserved target coordinates with current fitted values; solve the complete surrogate; accept only a true-objective decrease) or product-manifold Riemannian optimization.
-- **Stopping:** true observed-data objective decrease; first-order Riemannian residual.
+- **Method:** the public `mm` engine optimizes the true observed-data objective on a product manifold. Local Cayley charts preserve each rotation's determinant component; limited-memory BFGS uses analytic derivatives for rotations, translations, scales, and the consensus. Cell precisions enter as `diag(sqrt(w)) Q diag(sqrt(w))`; landmark reliability multiplies the landmark-vector loss. Every accepted step is checked against the true objective.
+- **Stopping:** true observed-data objective decrease and first-order residuals for every free rotation, translation, scale, and consensus block. Collective scales use the declared energy ellipsoid; a fixed consensus uses the centered unit sphere when translation is free. Objective stagnation alone is insufficient.
 - **Claim:** `first_order_stationary`. Never claim a closed-form SVD solution.
 
 ### Affine / LBW, Bai–Bartoli reference-space constraints
@@ -83,6 +83,8 @@ Convergence is assessed **modulo gauge**. Tied subspaces use projectors / princi
 - **Method:** variable projection. Eliminate \(B_i^\star=(\Phi_i^\top\Phi_i+\mu_i L_i)^\dagger\Phi_i^\top M\); form implicit \(P=\sum_i(I-H_i)\); bottom eigenvectors of \(P\) (or \(P_\nu=P+\nu\mathbf{1}\mathbf{1}^\top\)). Never form explicit inverses.
 - **Stopping:** eigen-gap / residual of the constrained eigenproblem.
 - **Claim:** `exact_closed_form` **only** for the stated formulation after assumptions are checked. Call this a global eigen-solution for that formulation, not “GPA is globally solved.”
+
+A fixed anchor adds a linear term in the consensus and is outside this homogeneous eigenproblem. Anchored affine/LBW/TPS requests are rejected explicitly. They do not inherit the unanchored eigen-solution or a stationary claim.
 
 ### LBW outside those assumptions
 

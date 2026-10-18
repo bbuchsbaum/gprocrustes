@@ -1,6 +1,8 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^\.beads$
+^\.mote$
+^figure$
 ^\.claude$
 ^\.cursor$
 ^docs$

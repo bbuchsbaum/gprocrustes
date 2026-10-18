@@ -24,14 +24,17 @@ procrustes(
 
 \item{rank_tol}{Relative singular-value threshold \eqn{\tau}.}
 
-\item{center}{If \code{NULL}, translation is eliminated for \(O(d)\) / isotropic
-similarity and stored as \(t^\star\). \code{FALSE} uses raw moments.}
+\item{center}{If \code{NULL}, orthogonal fits use their documented centered gauge,
+and similarity fits are centered only when \code{translation = TRUE}. \code{FALSE}
+uses raw moments and fixes the stored translation at zero.}
 }
 \value{
 A \code{proc_pair_fit}.
 }
 \description{
-Exact closed-form fit of \code{X} to \code{Y} under \eqn{O(d)}, \eqn{SO(d)}, or
-similarity. Translation is eliminated analytically; centering uses
-sufficient statistics and never forms \eqn{X_c} explicitly.
+Exact closed-form fit of \code{X} to \code{Y} under \eqn{O(d)}, \eqn{SO(d)},
+similarity, or signed permutations. Translation elimination and centering
+use sufficient statistics and never form \eqn{X_c} explicitly. Affine,
+LBW, and TPS specifications require their constrained multiway
+variable-projection solver and are not supported by this pairwise kernel.
 }
