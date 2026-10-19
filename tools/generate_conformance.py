@@ -101,13 +101,20 @@ def effective_rank(s: np.ndarray, tau: float = RANK_TOL) -> int:
 
 
 def pairwise_expected(X, Y, w, group: str, scaling: str, translation: bool) -> dict:
-    C, a, b = moments(X, Y, w)
+    # Orthogonal fits retain the documented centering convention. A similarity
+    # with translation explicitly prohibited must instead use raw moments.
+    if translation or scaling == "none":
+        C, a, b = moments(X, Y, w)
+    else:
+        C = X.T @ (w[:, None] * Y)
+        a = float(np.sum(w[:, None] * X * X))
+        b = float(np.sum(w[:, None] * Y * Y))
     R, svals, gamma = polar(C, group)
     r = effective_rank(svals)
     d = X.shape[1]
     if scaling == "isotropic":
         s_star = 0.0 if a == 0 else max(gamma / a, 0.0)
-        obj = b - (0.0 if a == 0 else (gamma * gamma) / a)
+        obj = b - (0.0 if a == 0 else max(gamma, 0.0) ** 2 / a)
     else:
         s_star = 1.0
         obj = a + b - 2.0 * gamma

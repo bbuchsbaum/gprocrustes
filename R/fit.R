@@ -427,7 +427,12 @@ align_gauge.gpa_fit <- function(x, reference) {
       tr$B <- tr$B %*% Q
       if (is.function(tr$apply_warp) || tr$spec$family %in% c("tps", "lbw", "affine")) {
         d <- ncol(tr$B)
-        tr <- .lbw_fitted(tr$spec, tr$B, list(controls = tr$extra$controls), d)
+        tr <- .lbw_fitted(
+          tr$spec,
+          tr$B,
+          list(controls = tr$extra$controls, tps_qc = tr$extra$tps_qc),
+          d
+        )
       }
     }
     tr

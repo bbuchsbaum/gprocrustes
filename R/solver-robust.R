@@ -73,109 +73,6 @@
   best
 }
 
-#' Cell-mask / anisotropic-coordinate majorization.
-#'
-#' Fills unobserved target coordinates with the current consensus, solves a
-#' complete weighted GPA, and accepts the step only if the true observed
-#' objective decreases.
-#'
-#' @noRd
-.mm_gpa <- function(data, spec, gauge, metric, alphas, control, anchor, loss) {
-  nms <- names(data$views)
-  n <- length(data$global_ids)
-  d <- ncol(data$views[[1L]])
-  chan <- .gproc_cell_channel(data, metric)
-  cells <- chan$mask
-  cweight <- chan$weight
-  covar <- .gproc_fitting_covariance(metric)
-  Q <- .gproc_coordinate_precision(covar)
-  inner <- control
-  inner$max_iterations <- min(as.integer(control$max_iterations %||% 500L), 40L)
-  inner$nstart <- 1L
-  raw <- .gower_gpa(data, spec, gauge, metric, alphas, inner, anchor)
-  transforms <- raw$transforms
-  Y <- .gproc_apply_all(data, transforms, n, d)
-  M <- .gproc_cell_consensus(Y, alphas, cells, n, d, cweight)
-  obj <- .gproc_observed_objective(Y, M, alphas, cells, Q, loss, cweight)
-  hist <- list()
-  t0 <- proc.time()[["elapsed"]]
-  status <- "maximum_iterations"
-  tol <- control$tolerance %||% 1e-8
-  for (it in seq_len(control$max_iterations %||% 500L)) {
-    M_surr <- M
-    Tnew <- transforms
-    for (nm in nms) {
-      if (!is.null(anchor) && identical(nm, anchor)) next
-      Targ <- M_surr
-      miss <- !cells[[nm]]
-      if (any(miss)) {
-        fill <- Y[[nm]]
-        use <- miss & is.finite(fill)
-        Targ[use] <- fill[use]
-      }
-      map <- data$row_map[[nm]]
-      X <- as.matrix(data$views[[nm]])
-      row_keep <- apply(cells[[nm]][map, , drop = FALSE], 1L, any)
-      if (!any(row_keep)) next
-      w_loc <- .gproc_local_landmark_weights(metric$landmark, map, n, nm)
-      if (!is.null(w_loc)) w_loc <- w_loc[row_keep]
-      pair <- .gproc_mm_block(
-        X[row_keep, , drop = FALSE],
-        Targ[map[row_keep], , drop = FALSE],
-        spec,
-        w_loc,
-        Q
-      )
-      Tnew[[nm]] <- pair$transform
-    }
-    Y_try <- .gproc_apply_all(data, Tnew, n, d)
-    M_try <- .gproc_cell_consensus(Y_try, alphas, cells, n, d, cweight)
-    obj_try <- .gproc_observed_objective(Y_try, M_try, alphas, cells, Q, loss, cweight)
-    accepted <- obj_try <= obj + 1e-12
-    if (accepted) {
-      transforms <- Tnew
-      Y <- Y_try
-      M <- M_try
-      obj <- obj_try
-    }
-    rel <- abs((if (length(hist)) hist[[length(hist)]]$objective else obj) - obj) / max(1, abs(obj))
-    stat <- .gproc_mm_stationarity(data, transforms, M, cells, cweight, Q, spec, alphas)
-    hist[[it]] <- data.frame(
-      iteration = it,
-      objective = obj,
-      relative_change = rel,
-      accepted_mm = accepted,
-      stationarity = stat,
-      elapsed_time = proc.time()[["elapsed"]] - t0
-    )
-    if (!accepted) {
-      status <- "stalled"
-      break
-    }
-    if (it > 1L && rel <= tol) {
-      status <- "converged"
-      break
-    }
-  }
-  raw$transforms <- transforms
-  raw$work_transforms <- transforms
-  raw$aligned <- Y
-  raw$consensus <- M
-  raw$objective <- obj
-  raw$history <- if (length(hist)) do.call(rbind, hist) else data.frame()
-  raw$numerical_status <- status
-  stat_final <- if (nrow(raw$history)) raw$history$stationarity[[nrow(raw$history)]] else Inf
-  raw$stationarity <- stat_final
-  raw$optimality_status <- if (identical(status, "converged")) {
-    "first_order_stationary"
-  } else {
-    "not_converged"
-  }
-  raw$cell_masks <- cells
-  raw$cell_weights <- cweight
-  raw
-}
-
 #' @noRd
 .gproc_local_landmark_weights <- function(landmark, map, n, view_name = NULL) {
   if (is.null(landmark)) {
@@ -215,30 +112,6 @@
     out[[nm]] <- G
   }
   out
-}
-
-#' @noRd
-.gproc_cell_consensus <- function(Y, alphas, cells, n, d, weights = NULL) {
-  num <- matrix(0, n, d)
-  den <- matrix(0, n, d)
-  for (nm in names(Y)) {
-    Yi <- Y[[nm]]
-    a <- alphas[[nm]]
-    keep <- cells[[nm]] & is.finite(Yi)
-    ww <- a
-    if (!is.null(weights) && !is.null(weights[[nm]])) {
-      W <- weights[[nm]]
-      ww <- a * W
-      keep <- keep & is.finite(W) & W > 0
-    }
-    num[keep] <- num[keep] + ww[keep] * Yi[keep]
-    den[keep] <- den[keep] + ww[keep]
-  }
-  M <- num
-  ok <- den > 0
-  M[ok] <- num[ok] / den[ok]
-  M[!ok] <- 0
-  M
 }
 
 #' @noRd
@@ -332,72 +205,44 @@
 #'
 #' @noRd
 .gproc_cell_channel <- function(data, metric) {
-  nms <- names(data$views)
   n <- length(data$global_ids)
   d <- ncol(data$views[[1L]])
-  mask <- vector("list", length(nms))
-  weight <- vector("list", length(nms))
-  names(mask) <- nms
-  names(weight) <- nms
-  raw <- if (inherits(metric, "proc_metric")) metric$cell else NULL
-  for (nm in nms) {
-    G <- matrix(FALSE, n, d)
-    W <- matrix(0, n, d)
-    loc <- data$observed[[nm]]
-    G[data$row_map[[nm]][loc], ] <- TRUE
-    W[G] <- 1
-    src <- NULL
-    if (!is.null(data$cells) && !is.null(data$cells[[nm]])) {
-      src <- data$cells[[nm]]
-    } else if (is.list(raw) && !is.null(raw[[nm]])) {
-      src <- raw[[nm]]
-    } else if (is.matrix(raw) && is.null(names(raw))) {
-      src <- raw
+  masks <- weights <- list()
+  raw <- metric$cell
+  for (nm in names(data$views)) {
+    map <- data$row_map[[nm]]
+    allowed <- matrix(FALSE, n, d)
+    allowed[map[data$observed[[nm]]], ] <- TRUE
+    if (!is.null(data$cells[[nm]])) {
+      C <- data$cells[[nm]]
+      if (anyNA(C)) .gproc_stop("invalid_problem", "Cell masks cannot contain NA.")
+      local <- matrix(FALSE, n, d)
+      local[map, ] <- C
+      allowed <- allowed & local
     }
+    W <- matrix(1, n, d)
+    src <- if (is.list(raw)) raw[[nm]] else raw
     if (!is.null(src)) {
       C <- as.matrix(src)
-      if (is.logical(C)) {
-        G[] <- FALSE
-        if (nrow(C) == n) G <- C else G[data$row_map[[nm]], ] <- C
-        W <- matrix(0, n, d)
-        W[G] <- 1
+      if (ncol(C) != d || !nrow(C) %in% c(n, length(map)) ||
+          any(!is.finite(C)) || any(C < 0)) {
+        .gproc_stop("invalid_problem", "Cell weights must be finite nonnegative matrices matching the view or global entities.")
+      }
+      if (is.list(raw) && nrow(C) == length(map)) {
+        W[] <- 0
+        W[map, ] <- C
+      } else if (nrow(C) == n) {
+        W <- C * 1
       } else {
-        storage.mode(C) <- "double"
-        if (nrow(C) == n) {
-          W <- C
-        } else {
-          W[] <- 0
-          W[data$row_map[[nm]], ] <- C
-        }
-        G <- is.finite(W) & W > 0
-        W[!G] <- 0
+        W[] <- 0
+        W[map, ] <- C
       }
     }
-    mask[[nm]] <- G
-    weight[[nm]] <- W
+    W[!allowed] <- 0
+    masks[[nm]] <- allowed & W > 0
+    weights[[nm]] <- W
   }
-  list(mask = mask, weight = weight)
-}
-
-#' @noRd
-.gproc_observed_objective <- function(Y, M, alphas, cells, Q, loss, weights = NULL) {
-  f <- 0
-  for (nm in names(Y)) {
-    dlt <- Y[[nm]] - M
-    keep <- cells[[nm]]
-    dlt[!keep] <- 0
-    if (is.null(Q) && !is.null(weights) && !is.null(weights[[nm]])) {
-      r2 <- rowSums(weights[[nm]] * dlt * dlt)
-    } else {
-      r2 <- .gproc_row_quadratic(dlt, Q)
-      if (!is.null(weights) && !is.null(weights[[nm]])) {
-        r2 <- r2 * rowMeans(weights[[nm]])
-      }
-    }
-    r <- sqrt(pmax(r2, 0))
-    f <- f + alphas[[nm]] * sum(.gproc_rho(r, if (is.null(loss)) proc_squared_l2() else loss))
-  }
-  f
+  list(mask = masks, weight = weights)
 }
 
 #' Row-wise e^T Q e. If Q is NULL this is the Euclidean squared length.
@@ -422,111 +267,4 @@
   }
   ev <- .gproc_eigen_sym(A)
   ev$vectors %*% (ifelse(ev$values > 1e-12, 1 / ev$values, 0) * t(ev$vectors))
-}
-
-#' Pairwise block update for the MM surrogate, including anisotropic Q.
-#'
-#' @noRd
-.gproc_mm_block <- function(X, Y, spec, w, Q) {
-  pair <- procrustes(X, Y, transform = spec, weights = w)
-  if (is.null(Q) || !.gproc_coordinate_anisotropic(list(coordinate = Q, as_precision = TRUE))) {
-    return(pair)
-  }
-  .gproc_anisotropic_refine(X, Y, spec, w, Q, pair)
-}
-
-#' Descent on O(d)/SO(d) for the e^T Q e pairwise residual.
-#'
-#' @noRd
-.gproc_anisotropic_refine <- function(X, Y, spec, w, Q, pair) {
-  tr <- pair$transform
-  R <- tr$R
-  s <- tr$s
-  t <- tr$t
-  obj <- function(R, s, t) {
-    E <- sweep(s * X %*% R, 2L, t, "+") - Y
-    ww <- if (is.null(w)) 1 else w
-    sum(ww * .gproc_row_quadratic(E, Q))
-  }
-  f <- obj(R, s, t)
-  moms <- proc_moments(X, Y, w, center = .gproc_eliminates_translation(spec))
-  A <- if (.gproc_eliminates_translation(spec)) {
-    centered_crossprod(X, X, w)
-  } else {
-    .gproc_raw_crossprod(X, X, w)
-  }
-  C <- moms$C
-  for (it in seq_len(25L)) {
-    G <- (s^2) * A %*% R %*% Q - s * C %*% Q
-    RtG <- crossprod(R, G)
-    skew <- 0.5 * (RtG - t(RtG))
-    R_try <- .polar_factor(R - skew, spec$group)$R
-    if (.gproc_eliminates_translation(spec)) {
-      t_try <- as.numeric(moms$ybar - s * (moms$xbar %*% R_try))
-    } else {
-      t_try <- t * 0
-    }
-    if (identical(spec$scaling, "isotropic")) {
-      aQ <- sum(diag(crossprod(R_try, A %*% R_try %*% Q)))
-      gQ <- sum(R_try * (C %*% Q))
-      s_try <- if (aQ > 0) max(gQ / aQ, 0) else 0
-      if (.gproc_eliminates_translation(spec)) {
-        t_try <- as.numeric(moms$ybar - s_try * (moms$xbar %*% R_try))
-      }
-    } else {
-      s_try <- s
-    }
-    f_try <- obj(R_try, s_try, t_try)
-    if (f_try <= f + 1e-14) {
-      R <- R_try
-      s <- s_try
-      t <- t_try
-      f <- f_try
-    } else {
-      break
-    }
-  }
-  tr <- .proc_fitted(spec, R, s, t)
-  pair$transform <- tr
-  pair$objective <- .gproc_transform_residual(X, Y, tr, if (is.null(w)) {
-    rep(1, nrow(X))
-  } else {
-    w
-  })
-  pair
-}
-
-#' First-order residual of the observed-cell / anisotropic objective.
-#'
-#' @noRd
-.gproc_mm_stationarity <- function(data, transforms, M, cells, weights, Q, spec, alphas) {
-  rmax <- 0
-  nms <- names(data$views)
-  for (nm in nms) {
-    map <- data$row_map[[nm]]
-    X <- as.matrix(data$views[[nm]])
-    Y <- apply_proc_transform(transforms[[nm]], X)
-    E <- Y - M[map, , drop = FALSE]
-    keep <- cells[[nm]][map, , drop = FALSE]
-    E[!keep] <- 0
-    if (!is.null(weights) && !is.null(weights[[nm]])) {
-      E <- E * weights[[nm]][map, , drop = FALSE]
-    }
-    if (!is.null(Q)) {
-      E <- E %*% Q
-    }
-    if (.gproc_eliminates_translation(spec)) {
-      w <- rep(1, nrow(X))
-      Xc <- sweep(X, 2L, weighted_centroid(X, w), "-")
-      Ec <- sweep(E, 2L, weighted_centroid(E, w), "-")
-      G <- crossprod(Xc, Ec)
-    } else {
-      G <- crossprod(X, E)
-    }
-    R <- transforms[[nm]]$R
-    S <- crossprod(R, G)
-    skew <- 0.5 * (S - t(S))
-    rmax <- max(rmax, sqrt(sum(skew^2)) * (alphas[[nm]] %||% 1))
-  }
-  rmax
 }

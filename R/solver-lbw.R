@@ -6,6 +6,12 @@
 #'
 #' @noRd
 .lbw_gpa <- function(data, spec, gauge, metric, alphas, control, anchor = NULL) {
+  if (!is.null(anchor) && spec$family %in% c("affine", "lbw", "tps")) {
+    .gproc_stop(
+      "invalid_problem",
+      "Anchored affine / LBW / TPS fitting is unsupported by the reference-space eigenproblem."
+    )
+  }
   nms <- names(data$views)
   n <- length(data$global_ids)
   d <- ncol(data$views[[1L]])
@@ -57,7 +63,12 @@
     }
     Mloc <- M[v$map, , drop = FALSE]
     B <- .gproc_psd_solve(v$A, crossprod(v$Phi, v$w_eff * Mloc))
-    pen <- pen + v$mu * sum(B * (v$L %*% B))
+    bending <- sum(B * (v$L %*% B))
+    bend_scale <- max(1, sum(B * B) * max(abs(v$L)))
+    if (!is.finite(bending) || bending < -1e-8 * bend_scale) {
+      .gproc_stop("invalid_problem", "LBW penalty produced a negative or non-finite bending energy.")
+    }
+    pen <- pen + v$mu * max(0, bending)
     tr <- .lbw_fitted(spec, B, v, d)
     transforms[[nm]] <- tr
     G <- matrix(NA_real_, n, d)
@@ -159,8 +170,11 @@
         }
       }
     }
+    mu <- as.numeric(spec$smoothness %||% 0)
+    if (length(mu) != 1L || !is.finite(mu) || mu < 0) {
+      .gproc_stop("invalid_problem", "LBW smoothness must be one finite nonnegative number.")
+    }
     built <- .lbw_basis(spec, X, mask)
-    mu <- spec$smoothness %||% 0
     a <- if (is.null(alphas)) 1 else alphas[[nm]]
     w_eff <- a * w
     A <- crossprod(built$Phi, w_eff * built$Phi) + mu * built$L
@@ -176,6 +190,7 @@
       mu = mu,
       alpha = a,
       controls = built$controls,
+      tps_qc = built$tps_qc,
       free_translation = built$free_translation,
       name = nm
     )
@@ -184,29 +199,32 @@
 }
 
 #' @noRd
-.lbw_basis <- function(spec, X, mask = NULL) {
+.lbw_basis <- function(spec, X, mask = NULL, controls = NULL, tps_qc = NULL) {
   d <- ncol(X)
   if (is.null(mask)) mask <- rep(TRUE, nrow(X))
   if (identical(spec$family, "affine") ||
       (identical(spec$family, "lbw") && identical(spec$basis, "affine"))) {
     Phi <- cbind(X, 1)
     L <- matrix(0, d + 1L, d + 1L)
+    .lbw_validate_penalty(L, ncol(Phi))
     a <- c(rep(0, d), 1)
     free <- sqrt(sum((Phi %*% a - 1)^2)) < 1e-10 && sqrt(sum((L %*% a)^2)) < 1e-10
-    return(list(Phi = Phi, L = L, controls = NULL, free_translation = free))
+    return(list(Phi = Phi, L = L, controls = NULL, tps_qc = NULL, free_translation = free))
   }
   if (identical(spec$family, "tps")) {
-    ctrl <- spec$control_points
+    ctrl <- controls %||% spec$control_points
     if (is.null(ctrl)) {
       ctrl <- X[mask, , drop = FALSE]
     } else {
       ctrl <- as.matrix(ctrl)
     }
-    Phi <- .gproc_tps_phi(X, ctrl)
-    L <- .gproc_tps_L(ctrl)
+    Qc <- tps_qc %||% .gproc_tps_qc(ctrl)
+    Phi <- .gproc_tps_phi(X, ctrl, Qc)
+    L <- .gproc_tps_L(ctrl, Qc)
+    .lbw_validate_penalty(L, ncol(Phi))
     a <- c(1, rep(0, ncol(Phi) - 1L))
     free <- sqrt(sum((Phi %*% a - 1)^2)) < 1e-8 && sqrt(sum((L %*% a)^2)) < 1e-8
-    return(list(Phi = Phi, L = L, controls = ctrl, free_translation = free))
+    return(list(Phi = Phi, L = L, controls = ctrl, tps_qc = Qc, free_translation = free))
   }
   if (is.function(spec$basis)) {
     Phi <- as.matrix(spec$basis(X))
@@ -221,13 +239,33 @@
   } else {
     L <- as.matrix(L)
   }
+  .lbw_validate_penalty(L, ncol(Phi))
   ones <- rep(1, nrow(Phi))
   a <- tryCatch(.gproc_psd_solve(crossprod(Phi), crossprod(Phi, ones)), error = function(e) NULL)
   free <- FALSE
   if (!is.null(a)) {
     free <- sqrt(sum((Phi %*% a - 1)^2)) < 1e-6 && sqrt(sum((L %*% a)^2)) < 1e-6
   }
-  list(Phi = Phi, L = L, controls = NULL, free_translation = free)
+  list(Phi = Phi, L = L, controls = NULL, tps_qc = NULL, free_translation = free)
+}
+
+#' @noRd
+.lbw_validate_penalty <- function(L, p) {
+  if (!is.matrix(L) || nrow(L) != p || ncol(L) != p) {
+    .gproc_stop("invalid_problem", "LBW penalty must be a square matrix matching the basis dimension.")
+  }
+  if (any(!is.finite(L))) {
+    .gproc_stop("invalid_problem", "LBW penalty must be finite.")
+  }
+  scale <- max(1, sqrt(sum(L * L)))
+  if (sqrt(sum((L - t(L))^2)) > 1e-8 * scale) {
+    .gproc_stop("invalid_problem", "LBW penalty must be symmetric.")
+  }
+  vals <- .gproc_eigen_sym((L + t(L)) / 2)$values
+  if (min(vals) < -1e-8 * max(1, max(abs(vals)))) {
+    .gproc_stop("invalid_problem", "LBW penalty must be positive semidefinite.")
+  }
+  invisible(TRUE)
 }
 
 #' @noRd
@@ -238,14 +276,26 @@
     out[!is.finite(out) | r < 1e-15] <- 0
     out
   } else if (d == 3L) {
-    r
+    -r
   } else {
     .gproc_stop("invalid_problem", "Built-in TPS supports d = 2 or d = 3.")
   }
 }
 
 #' @noRd
-.gproc_tps_phi <- function(X, controls) {
+.gproc_tps_qc <- function(controls) {
+  controls <- as.matrix(controls)
+  Paff <- cbind(1, controls)
+  qrP <- qr(Paff)
+  Q <- qr.Q(qrP, complete = TRUE)
+  if (ncol(Q) <= qrP$rank) {
+    return(matrix(0, nrow(controls), 0L))
+  }
+  Q[, seq.int(qrP$rank + 1L, ncol(Q)), drop = FALSE]
+}
+
+#' @noRd
+.gproc_tps_phi <- function(X, controls, Qc = NULL) {
   X <- as.matrix(X)
   controls <- as.matrix(controls)
   n <- nrow(X)
@@ -257,11 +307,12 @@
     r <- sqrt(rowSums(delta * delta))
     U[, k] <- .gproc_tps_kernel(r, d)
   }
-  cbind(1, X, U)
+  Qc <- Qc %||% .gproc_tps_qc(controls)
+  cbind(1, X, U %*% Qc)
 }
 
 #' @noRd
-.gproc_tps_L <- function(controls) {
+.gproc_tps_L <- function(controls, Qc = NULL) {
   controls <- as.matrix(controls)
   c <- nrow(controls)
   d <- ncol(controls)
@@ -272,21 +323,13 @@
     K[i, ] <- .gproc_tps_kernel(r, d)
   }
   K <- (K + t(K)) / 2
-  L <- matrix(0, 1L + d + c, 1L + d + c)
-  if (c) {
-    idx <- (2L + d):(1L + d + c)
-    Paff <- cbind(1, controls)
-    qrP <- qr(Paff)
-    rnk <- qrP$rank
-    Q <- qr.Q(qrP, complete = TRUE)
-    if (ncol(Q) > rnk) {
-      Qc <- Q[, (rnk + 1L):ncol(Q), drop = FALSE]
-      Kpsd <- Qc %*% crossprod(Qc, K %*% Qc) %*% t(Qc)
-    } else {
-      Kpsd <- matrix(0, c, c)
-    }
-    Kpsd <- (Kpsd + t(Kpsd)) / 2
-    L[idx, idx] <- Kpsd
+  Qc <- Qc %||% .gproc_tps_qc(controls)
+  q <- ncol(Qc)
+  L <- matrix(0, 1L + d + q, 1L + d + q)
+  if (q) {
+    idx <- (2L + d):(1L + d + q)
+    Kpsd <- crossprod(Qc, K %*% Qc)
+    L[idx, idx] <- (Kpsd + t(Kpsd)) / 2
   }
   L
 }
@@ -320,7 +363,7 @@
   controls <- view$controls
   apply_warp <- function(Xnew) {
     if (identical(spec$family, "tps")) {
-      .gproc_tps_phi(Xnew, if (is.null(controls)) Xnew else controls) %*% B
+      .gproc_tps_phi(Xnew, if (is.null(controls)) Xnew else controls, view$tps_qc) %*% B
     } else if (is.function(spec$basis)) {
       as.matrix(spec$basis(Xnew)) %*% B
     } else {
@@ -334,7 +377,7 @@
     t = rep(0, d),
     B = B,
     apply_warp = apply_warp,
-    extra = list(controls = controls)
+    extra = list(controls = controls, tps_qc = view$tps_qc)
   )
 }
 

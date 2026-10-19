@@ -29,5 +29,17 @@ A \code{proc_inference} object.
 \description{
 Fitting and inference are separate. Bootstrap replicates are gauge-aligned
 to the original consensus before any coordinatewise summary (math section 39).
+Entity bootstrap uses frequency weights for resampled entity contributions,
+then evaluates each fitted transform on the fixed original landmarks; it
+estimates conditional alignment uncertainty at those landmarks.
 Analytic standard errors are a declared tangent-space approximation.
+}
+\details{
+Bootstrap currently supports complete squared-L2 orthogonal fits
+and unscaled similarities, with optional configuration and landmark weights.
+Bootstrap requests with robust losses, cell masks, precision metrics,
+scale constraints, or anchors are rejected explicitly. Configuration draws
+are refitted even when every sampled configuration is the same.
+Permutation inference tests smaller-than-null fitted loss by permuting
+coordinate values relative to fixed entity IDs; it assumes exchangeable rows.
 }

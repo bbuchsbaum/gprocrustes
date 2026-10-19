@@ -1,16 +1,19 @@
 #' Pairwise Procrustes kernel.
 #'
-#' Exact closed-form fit of `X` to `Y` under \eqn{O(d)}, \eqn{SO(d)}, or
-#' similarity. Translation is eliminated analytically; centering uses
-#' sufficient statistics and never forms \eqn{X_c} explicitly.
+#' Exact closed-form fit of `X` to `Y` under \eqn{O(d)}, \eqn{SO(d)},
+#' similarity, or signed permutations. Translation elimination and centering
+#' use sufficient statistics and never form \eqn{X_c} explicitly. Affine,
+#' LBW, and TPS specifications require their constrained multiway
+#' variable-projection solver and are not supported by this pairwise kernel.
 #'
 #' @param X Source configuration, \eqn{n \times d}.
 #' @param Y Target configuration, \eqn{n \times d}.
 #' @param transform Transform specification or shortcut.
 #' @param weights Row weights \eqn{w}.
 #' @param rank_tol Relative singular-value threshold \eqn{\tau}.
-#' @param center If `NULL`, translation is eliminated for \(O(d)\) / isotropic
-#'   similarity and stored as \eqn{t^\star}. `FALSE` uses raw moments.
+#' @param center If `NULL`, orthogonal fits use their documented centered gauge,
+#'   and similarity fits are centered only when `translation = TRUE`. `FALSE`
+#'   uses raw moments and fixes the stored translation at zero.
 #' @return A `proc_pair_fit`.
 #' @export
 procrustes <- function(X,
@@ -34,8 +37,17 @@ procrustes <- function(X,
     )
   }
   w <- .gproc_row_weights(weights, .gproc_nrow(X))
+  if (!spec$family %in% c("orthogonal", "similarity", "signed_permutation")) {
+    .gproc_stop(
+      "invalid_problem",
+      "Pairwise Procrustes supports orthogonal, similarity, and signed-permutation transforms only."
+    )
+  }
   if (identical(spec$family, "signed_permutation")) {
     return(.procrustes_signed_perm(X, Y, w, spec, rank_tol))
+  }
+  if (isTRUE(center) && identical(spec$family, "similarity") && !isTRUE(spec$translation)) {
+    .gproc_stop("invalid_problem", "center=TRUE conflicts with translation=FALSE in the similarity specification.")
   }
   if (is.null(center)) {
     center <- .gproc_eliminates_translation(spec)
@@ -82,8 +94,7 @@ procrustes <- function(X,
 #' @noRd
 .gproc_eliminates_translation <- function(spec) {
   isTRUE(spec$translation) ||
-    identical(spec$family, "orthogonal") ||
-    identical(spec$scaling, "isotropic")
+    identical(spec$family, "orthogonal")
 }
 
 #' Polar / proper-polar factor of a cross-covariance.
@@ -172,7 +183,7 @@ polar_factor <- function(C, group = c("O", "SO"), rank_tol = 1e-10) {
   best_score <- scores[[best_i]]
   scale_c <- max(1, max(abs(C)))
   n_best <- sum(abs(scores - best_score) <= rank_tol * scale_c)
-  P <- diag(d)[best_p, , drop = FALSE]
+  P <- diag(d)[, best_p, drop = FALSE]
   signs <- sign(C[cbind(best_p, seq_len(d))])
   zero_sel <- abs(C[cbind(best_p, seq_len(d))]) <= rank_tol * scale_c
   signs[signs == 0] <- 1

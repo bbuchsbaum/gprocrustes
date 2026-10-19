@@ -29,7 +29,18 @@ proc_shape_model <- function(covariance = proc_covariance(kind = "model"),
 #'
 #' Fitting and inference are separate. Bootstrap replicates are gauge-aligned
 #' to the original consensus before any coordinatewise summary (math section 39).
+#' Entity bootstrap uses frequency weights for resampled entity contributions,
+#' then evaluates each fitted transform on the fixed original landmarks; it
+#' estimates conditional alignment uncertainty at those landmarks.
 #' Analytic standard errors are a declared tangent-space approximation.
+#'
+#' @details Bootstrap currently supports complete squared-L2 orthogonal fits
+#'   and unscaled similarities, with optional configuration and landmark weights.
+#'   Bootstrap requests with robust losses, cell masks, precision metrics,
+#'   scale constraints, or anchors are rejected explicitly. Configuration draws
+#'   are refitted even when every sampled configuration is the same.
+#'   Permutation inference tests smaller-than-null fitted loss by permuting
+#'   coordinate values relative to fixed entity IDs; it assumes exchangeable rows.
 #'
 #' @param object A `gpa_fit`.
 #' @param model A `proc_shape_model`.
@@ -56,7 +67,22 @@ infer.gpa_fit <- function(object,
     model <- proc_shape_model()
   }
   method <- match.arg(method)
-  n_resamples <- as.integer(n_resamples)[1L]
+  if (length(n_resamples) != 1L) {
+    .gproc_stop("invalid_problem", "n_resamples must be a finite integer.")
+  }
+  n_input <- suppressWarnings(as.numeric(n_resamples)[1L])
+  if (!is.finite(n_input) || n_input > .Machine$integer.max ||
+      n_input < -.Machine$integer.max || n_input != as.integer(n_input)) {
+    .gproc_stop("invalid_problem", "n_resamples must be a finite integer.")
+  }
+  n_resamples <- as.integer(n_input)
+  min_draws <- if (identical(method, "bootstrap")) 2L else if (identical(method, "permutation")) 1L else 0L
+  if (n_resamples < min_draws) {
+    .gproc_stop(
+      "invalid_problem",
+      sprintf("n_resamples must be at least %d for %s inference.", min_draws, method)
+    )
+  }
   switch(
     method,
     bootstrap = .gproc_infer_bootstrap(object, model, n_resamples),
@@ -248,40 +274,141 @@ print.proc_cv <- function(x, ...) {
 }
 
 #' @noRd
-.gproc_refit <- function(object, data) {
+.gproc_refit <- function(object, data, metric = NULL) {
   spec <- object$problem$transform
   gauge <- object$gauge$spec
   if (!inherits(gauge, "proc_gauge")) gauge <- proc_gauge()
-  metric <- object$problem$metric
+  metric <- metric %||% object$problem$metric
   if (!inherits(metric, "proc_metric")) metric <- proc_metric()
   loss <- object$problem$loss
   if (!inherits(loss, "proc_loss")) loss <- proc_squared_l2()
-  solver <- object$solver
-  if (!solver %in% c("gpm", "gower_bcd", "irls", "mm", "pairwise_polar", "auto")) {
-    solver <- "auto"
-  }
   gpa(
     data,
     transform = spec,
     gauge = gauge,
     metric = metric,
     loss = loss,
-    solver = solver,
+    solver = "auto",
     control = gpa_control(
-      tolerance = 1e-6,
-      max_iterations = 80L,
+      tolerance = 1e-10,
+      max_iterations = 500L,
       certify = "never",
       accelerate = FALSE,
       init = "sequential"
-    )
+    ),
+    anchor = object$problem$anchor
   )
 }
 
 #' @noRd
 .gproc_align_consensus <- function(M_b, M0, spec) {
   grp <- if (identical(spec$group, "SO")) "SO" else "O"
-  pair <- procrustes(M_b, M0, transform = proc_orthogonal(grp))
-  list(M = M_b %*% pair$transform$R, R = pair$transform$R)
+  translate <- .gproc_eliminates_translation(spec)
+  pair <- procrustes(
+    M_b,
+    M0,
+    transform = proc_similarity(group = grp, translation = translate, scaling = "none")
+  )
+  list(M = apply_proc_transform(pair$transform, M_b), R = pair$transform$R,
+       t = pair$transform$t)
+}
+
+#' @noRd
+.gproc_bootstrap_metric <- function(object, data, counts) {
+  metric <- object$problem$metric
+  if (!inherits(metric, "proc_metric")) metric <- proc_metric()
+  n <- length(data$global_ids)
+  metric$landmark <- lapply(names(data$views), function(nm) {
+    map <- data$row_map[[nm]]
+    base <- .gproc_local_landmark_weights(metric$landmark, map, n, nm)
+    if (is.null(base)) base <- rep(1, length(map))
+    as.numeric(base) * counts[map]
+  })
+  names(metric$landmark) <- names(data$views)
+  metric
+}
+
+#' @noRd
+.gproc_full_original_consensus <- function(object, data, fit_b) {
+  metric <- object$problem$metric
+  if (!inherits(metric, "proc_metric")) metric <- proc_metric()
+  alphas <- .gproc_config_weights(metric$configuration, names(data$views))
+  n <- length(data$global_ids)
+  d <- ncol(consensus(fit_b))
+  num <- matrix(0, n, d)
+  den <- numeric(n)
+  for (nm in names(data$views)) {
+    map <- data$row_map[[nm]]
+    Y <- apply_proc_transform(transformations(fit_b)[[nm]], data$views[[nm]])
+    keep <- data$observed[[nm]]
+    ww <- .gproc_local_landmark_weights(metric$landmark, map, n, nm)
+    if (is.null(ww)) ww <- rep(1, length(map))
+    ww <- alphas[[nm]] * as.numeric(ww)
+    use <- keep & is.finite(ww) & ww > 0
+    if (!any(use)) next
+    gi <- map[use]
+    num[gi, ] <- num[gi, , drop = FALSE] + Y[use, , drop = FALSE] * ww[use]
+    den[gi] <- den[gi] + ww[use]
+  }
+  out <- num
+  use <- den > 0
+  out[use, ] <- num[use, , drop = FALSE] / den[use]
+  out[!use, ] <- 0
+  out
+}
+
+#' @noRd
+.gproc_bootstrap_supported <- function(object, data, configurations = FALSE) {
+  compiled <- object$problem
+  if (!compiled$transform$family %in% c("orthogonal", "similarity")) {
+    .gproc_stop(
+      "invalid_problem",
+      "Bootstrap currently supports orthogonal or unscaled similarity transforms only."
+    )
+  }
+  if (!identical(compiled$loss$family, "squared_l2")) {
+    .gproc_stop("invalid_problem", "Bootstrap currently supports squared-L2 fits only.")
+  }
+  if (isTRUE(compiled$cell_masked) || isTRUE(compiled$cell_metric)) {
+    .gproc_stop("invalid_problem", "Bootstrap with cell masks or coordinate precision is not implemented.")
+  }
+  if (!is.null(compiled$metric$precision)) {
+    .gproc_stop("invalid_problem", "Bootstrap with a precision metric is not implemented.")
+  }
+  if (!identical(compiled$transform$scaling, "none") ||
+      !identical(compiled$gauge$scale, "none")) {
+    .gproc_stop("invalid_problem", "Bootstrap with scale constraints is not implemented.")
+  }
+  if (!isTRUE(compiled$complete_covering)) {
+    .gproc_stop("invalid_problem", "Entity bootstrap currently requires a complete covering.")
+  }
+  if (!is.null(compiled$anchor)) {
+    .gproc_stop("invalid_problem", "Bootstrap with an anchor is not implemented.")
+  }
+  invisible(data)
+}
+
+#' @noRd
+.gproc_resampled_configurations <- function(data, take, names_b) {
+  proc_data(
+    stats::setNames(data$views[take], names_b),
+    ids = stats::setNames(data$ids[take], names_b),
+    observed = stats::setNames(data$observed[take], names_b),
+    cells = stats::setNames(data$cells[take], names_b),
+    metadata = if (is.null(data$metadata)) NULL else stats::setNames(data$metadata[take], names_b)
+  )
+}
+
+#' @noRd
+.gproc_resampled_configuration_metric <- function(object, take, names_b) {
+  metric <- object$problem$metric
+  if (!inherits(metric, "proc_metric")) metric <- proc_metric()
+  alpha <- object$weights$configuration %||% .gproc_config_weights(metric$configuration, names(object$raw_data$views))
+  metric$configuration <- unname(alpha[take])
+  if (is.list(metric$landmark)) {
+    metric$landmark <- stats::setNames(metric$landmark[take], names_b)
+  }
+  metric
 }
 
 #' @noRd
@@ -290,35 +417,45 @@ print.proc_cv <- function(x, ...) {
   n <- length(data$global_ids)
   spec <- object$problem$transform
   M0 <- consensus(object)
-  if (!isTRUE(object$problem$complete_covering)) {
-    .gproc_stop("invalid_problem", "Entity bootstrap currently requires a complete covering.")
-  }
   reps <- array(NA_real_, c(nrow(M0), ncol(M0), B))
   if (identical(model$resampling, "configurations")) {
+    .gproc_bootstrap_supported(object, data, configurations = TRUE)
     nms <- names(data$views)
     for (b in seq_len(B)) {
-      take <- sample(nms, length(nms), replace = TRUE)
-      views_b <- data$views[take]
-      names(views_b) <- paste0("boot", seq_along(views_b))
-      if (length(unique(take)) < 2L) {
-        reps[, , b] <- M0
-        next
-      }
-      fit_b <- .gproc_refit(object, proc_data(views_b))
+      take <- sample.int(length(nms), length(nms), replace = TRUE)
+      names_b <- paste0("boot", seq_along(take))
+      dat_b <- .gproc_resampled_configurations(data, take, names_b)
+      metric_b <- .gproc_resampled_configuration_metric(object, take, names_b)
+      fit_b <- .gproc_refit(object, dat_b, metric_b)
       reps[, , b] <- .gproc_align_consensus(consensus(fit_b), M0, spec)$M
     }
-    assumption <- "configurations resampled with replacement; then gauge-aligned"
+    assumption <- "configurations resampled with replacement and refit; then gauge-aligned"
   } else {
+    .gproc_bootstrap_supported(object, data)
     for (b in seq_len(B)) {
       idx <- sample.int(n, n, replace = TRUE)
-      dat_b <- .gproc_subset_entities(data, idx)
-      fit_b <- .gproc_refit(object, dat_b)
-      reps[, , b] <- .gproc_align_consensus(consensus(fit_b), M0, spec)$M
+      counts <- tabulate(idx, n)
+      metric_b <- .gproc_bootstrap_metric(object, data, counts)
+      fit_b <- .gproc_refit(object, data, metric_b)
+      M_b <- .gproc_full_original_consensus(object, data, fit_b)
+      reps[, , b] <- if (is.null(object$problem$anchor)) {
+        .gproc_align_consensus(M_b, M0, spec)$M
+      } else {
+        M_b
+      }
     }
-    assumption <- "entities resampled together across views; then gauge-aligned"
+    assumption <- paste(
+      "entities resampled through multiplicity weights on the original data; then gauge-aligned",
+      "conditional alignment uncertainty at fixed original landmarks"
+    )
   }
   mu <- apply(reps, c(1L, 2L), mean)
   se <- apply(reps, c(1L, 2L), stats::sd)
+  gauge_note <- if (is.null(object$problem$anchor)) {
+    "each replicate aligned to the original consensus"
+  } else {
+    "anchor fixes the replicate frame; no common gauge alignment"
+  }
   structure(
     list(
       method = "bootstrap",
@@ -328,7 +465,7 @@ print.proc_cv <- function(x, ...) {
       se = se,
       replicates = reps,
       n_resamples = B,
-      gauge = "each replicate polar-aligned to the original consensus",
+      gauge = gauge_note,
       assumptions = c(
         assumption,
         "coordinatewise summaries are after gauge alignment only",
@@ -347,17 +484,26 @@ print.proc_cv <- function(x, ...) {
     .gproc_stop("invalid_problem", "Permutation currently requires a complete covering.")
   }
   nms <- names(data$views)
-  T0 <- object$decomposition$residual_energy %||% object$objective
+  T0 <- object$objective
   Tperm <- numeric(B)
   for (b in seq_len(B)) {
     views_p <- data$views
     for (nm in nms[-1L]) {
-      views_p[[nm]] <- views_p[[nm]][sample.int(n), , drop = FALSE]
+      X <- views_p[[nm]][sample.int(n), , drop = FALSE]
+      rownames(X) <- rownames(views_p[[nm]])
+      views_p[[nm]] <- X
     }
-    fit_p <- .gproc_refit(object, proc_data(views_p))
-    Tperm[[b]] <- fit_p$decomposition$residual_energy %||% fit_p$objective
+    dat_p <- proc_data(
+      views_p,
+      ids = data$ids,
+      observed = data$observed,
+      cells = data$cells,
+      metadata = data$metadata
+    )
+    fit_p <- .gproc_refit(object, dat_p)
+    Tperm[[b]] <- fit_p$objective
   }
-  p <- (1 + sum(Tperm >= T0)) / (1 + B)
+  p <- (1 + sum(Tperm <= T0)) / (1 + B)
   structure(
     list(
       method = "permutation",
@@ -367,10 +513,10 @@ print.proc_cv <- function(x, ...) {
       null_statistics = Tperm,
       p_value = p,
       n_resamples = B,
-      gauge = "not applicable; compares residual energy",
+      gauge = "not applicable; compares fitted objective",
       assumptions = c(
-        "independent row permutations destroy correspondence in every view but the first",
-        "the test statistic is residual energy after a refit",
+        "independent value permutations destroy correspondence while IDs remain fixed",
+        "the test statistic is the fitted objective after a refit",
         "this is not a test of a Gaussian shape model"
       )
     ),

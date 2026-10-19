@@ -1475,6 +1475,16 @@ Suppose bootstrap replicate \(b\) produces \(M^{(b)}\). It is meaningless to ave
 
 First solve \(Q_b=\arg\min_{Q\in G}\|M^{(b)}Q-M^{(0)}\|_F^2\), then replace \(M^{(b)}\leftarrow M^{(b)}Q_b\). Only then calculate coordinatewise uncertainty.
 
+For an entity bootstrap, sampled row positions are not fixed landmark identities.
+The implemented estimand is **conditional alignment uncertainty at the original
+landmarks**: draw entity multiplicities, refit transformations using those
+frequency weights, then evaluate the transformations and the original weighted
+consensus on the complete original entity index. Align that full reference to
+the original gauge before coordinatewise summaries. This is distinct from
+uncertainty over a new population of landmark locations. Configuration bootstrap
+instead resamples and refits configurations. Unsupported loss, metric, scale,
+or anchor combinations are refused explicitly.
+
 If the reference has repeated or nearly repeated eigenvalues, individual canonical axes are unstable. Summarize an eigenspace through its projector \(P=UU^\top\) or principal angles \(\theta_j=\arccos\sigma_j(U^\top V)\).
 
 ---
